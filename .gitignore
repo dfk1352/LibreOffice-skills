@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+build/
+dist/
+wheels/
+*.egg-info/
+.python-version
+
+# Virtual environments
+.venv/
+
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Test artifacts
+test-output/
+
+# Packaged skills
+*.skill
+
+# OS
+.DS_Store
+Thumbs.db

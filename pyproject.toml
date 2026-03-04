@@ -1,0 +1,19 @@
+[project]
+name = "libreoffice-skills"
+version = "0.3.0"
+description = "Production-ready skill suite for LibreOffice Writer, Calc, and Impress via the Python UNO API"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest~=8.4",
+    "pytest-cov~=4.1",
+    "ruff~=0.15",
+    "mypy~=1.19",
+    "pillow~=10.4",
+]
