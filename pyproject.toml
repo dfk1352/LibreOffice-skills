@@ -17,3 +17,10 @@ dev = [
     "mypy~=1.19",
     "pillow~=10.4",
 ]
+
+[tool.mypy]
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = ["uno", "com.sun.star.*"]
+ignore_missing_imports = true
