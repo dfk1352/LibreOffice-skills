@@ -1,5 +1,7 @@
 # LibreOffice Skills
 
+[![CI](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml)
+
 Python skill suite for [LibreOffice](https://www.libreoffice.org/) Writer, Calc, and Impress via the UNO API.
 Designed for AI agents to create and edit documents, spreadsheets, and presentations through deterministic, file-system-safe operations.
 
