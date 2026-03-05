@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Package a skill directory into a .skill zip archive.
 
-The libreoffice_skills Python package is expected to be already bundled
-inside each skill directory (e.g. skills/libreoffice-writer/libreoffice_skills/).
+The LibreOffice skill modules are expected to be bundled under scripts/.
 This script simply zips the skill folder contents for distribution.
 """
 
@@ -47,10 +46,10 @@ def _validate_skill(skill_dir: Path) -> str:
         raise ValueError("Skill name must use letters, numbers, and hyphens")
     if not frontmatter["description"].startswith("Use when"):
         raise ValueError("Description must start with 'Use when'")
-    bundle_dir = skill_dir / "libreoffice_skills"
+    bundle_dir = skill_dir / "scripts"
     if not bundle_dir.is_dir():
         raise FileNotFoundError(
-            f"Missing libreoffice_skills/ bundle in {skill_dir}. "
+            f"Missing scripts/ bundle in {skill_dir}. "
             "Run scripts/sync_bundles.py first."
         )
     return name

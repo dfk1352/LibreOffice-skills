@@ -16,9 +16,9 @@ def _create_minimal_wav(path):
 
 
 def test_add_audio_returns_index(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.media import add_audio
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.core import create_presentation
+    from impress.media import add_audio
+    from uno_bridge import uno_context
 
     path = tmp_path / "audio.odp"
     create_presentation(str(path))
@@ -44,9 +44,9 @@ def test_add_audio_returns_index(tmp_path):
 
 
 def test_add_video_returns_index(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.media import add_video
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.core import create_presentation
+    from impress.media import add_video
+    from uno_bridge import uno_context
 
     path = tmp_path / "video.odp"
     create_presentation(str(path))
@@ -72,9 +72,9 @@ def test_add_video_returns_index(tmp_path):
 
 
 def test_add_audio_missing_file_raises(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import MediaNotFoundError
-    from libreoffice_skills.impress.media import add_audio
+    from impress.core import create_presentation
+    from impress.exceptions import MediaNotFoundError
+    from impress.media import add_audio
 
     path = tmp_path / "audio_missing.odp"
     create_presentation(str(path))
@@ -84,9 +84,9 @@ def test_add_audio_missing_file_raises(tmp_path):
 
 
 def test_add_video_missing_file_raises(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import MediaNotFoundError
-    from libreoffice_skills.impress.media import add_video
+    from impress.core import create_presentation
+    from impress.exceptions import MediaNotFoundError
+    from impress.media import add_video
 
     path = tmp_path / "video_missing.odp"
     create_presentation(str(path))

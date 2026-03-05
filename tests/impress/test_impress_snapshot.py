@@ -5,7 +5,7 @@ import pytest
 
 def test_snapshot_result_fields():
     """SnapshotResult has file_path, width, height, dpi."""
-    from libreoffice_skills.impress.snapshot import SnapshotResult
+    from impress.snapshot import SnapshotResult
 
     result = SnapshotResult(
         file_path="/tmp/out.png",
@@ -21,8 +21,8 @@ def test_snapshot_result_fields():
 
 def test_snapshot_error_hierarchy():
     """SnapshotError is a subclass of ImpressSkillError; FilterError of SnapshotError."""
-    from libreoffice_skills.impress.exceptions import ImpressSkillError
-    from libreoffice_skills.impress.snapshot import FilterError, SnapshotError
+    from impress.exceptions import ImpressSkillError
+    from impress.snapshot import FilterError, SnapshotError
 
     assert issubclass(SnapshotError, ImpressSkillError)
     assert issubclass(FilterError, SnapshotError)
@@ -30,9 +30,9 @@ def test_snapshot_error_hierarchy():
 
 def test_snapshot_slide_creates_png(tmp_path):
     """snapshot_slide creates a valid PNG file with non-zero size."""
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.snapshot import snapshot_slide
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.snapshot import snapshot_slide
 
     path = tmp_path / "snap.odp"
     create_presentation(str(path))
@@ -55,9 +55,9 @@ def test_snapshot_slide_creates_png(tmp_path):
 
 def test_snapshot_slide_invalid_index_raises(tmp_path):
     """snapshot_slide raises InvalidSlideIndexError for bad index."""
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import InvalidSlideIndexError
-    from libreoffice_skills.impress.snapshot import snapshot_slide
+    from impress.core import create_presentation
+    from impress.exceptions import InvalidSlideIndexError
+    from impress.snapshot import snapshot_slide
 
     path = tmp_path / "snap_bad.odp"
     create_presentation(str(path))
@@ -68,8 +68,8 @@ def test_snapshot_slide_invalid_index_raises(tmp_path):
 
 def test_snapshot_slide_missing_doc_raises(tmp_path):
     """snapshot_slide raises DocumentNotFoundError for missing file."""
-    from libreoffice_skills.impress.exceptions import DocumentNotFoundError
-    from libreoffice_skills.impress.snapshot import snapshot_slide
+    from impress.exceptions import DocumentNotFoundError
+    from impress.snapshot import snapshot_slide
 
     with pytest.raises(DocumentNotFoundError):
         snapshot_slide(
@@ -81,8 +81,8 @@ def test_snapshot_slide_missing_doc_raises(tmp_path):
 
 def test_snapshot_slide_custom_dimensions(tmp_path):
     """snapshot_slide with custom width/height reflected in result."""
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.snapshot import snapshot_slide
+    from impress.core import create_presentation
+    from impress.snapshot import snapshot_slide
 
     path = tmp_path / "snap_hd.odp"
     create_presentation(str(path))

@@ -2,9 +2,9 @@
 
 
 def test_apply_currency_format(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.formatting import apply_format
-    from libreoffice_skills.uno_bridge import uno_context
+    from calc.core import create_spreadsheet
+    from calc.formatting import apply_format
+    from uno_bridge import uno_context
 
     path = tmp_path / "format.ods"
     create_spreadsheet(str(path))
@@ -38,9 +38,9 @@ def test_apply_currency_format(tmp_path) -> None:
 
 
 def test_apply_color_accepts_name(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.formatting import apply_format
-    from libreoffice_skills.uno_bridge import uno_context
+    from calc.core import create_spreadsheet
+    from calc.formatting import apply_format
+    from uno_bridge import uno_context
 
     path = tmp_path / "format_color.ods"
     create_spreadsheet(str(path))

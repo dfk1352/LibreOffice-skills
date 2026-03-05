@@ -2,10 +2,10 @@
 
 
 def test_find_replace_in_presentation(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.find_replace import find_replace
-    from libreoffice_skills.impress.slides import get_slide_inventory
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.find_replace import find_replace
+    from impress.slides import get_slide_inventory
 
     path = tmp_path / "find_replace.odp"
     create_presentation(str(path))
@@ -21,9 +21,9 @@ def test_find_replace_in_presentation(tmp_path):
 
 
 def test_find_replace_returns_zero_for_no_match(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.find_replace import find_replace
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.find_replace import find_replace
 
     path = tmp_path / "no_match.odp"
     create_presentation(str(path))

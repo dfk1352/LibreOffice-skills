@@ -2,8 +2,8 @@
 
 
 def test_define_named_range(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.named_ranges import (
+    from calc.core import create_spreadsheet
+    from calc.named_ranges import (
         define_named_range,
         get_named_range,
     )

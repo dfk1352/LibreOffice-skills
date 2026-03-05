@@ -1,12 +1,12 @@
 ---
 name: libreoffice-calc
-description: Use when creating, editing, formatting, or extracting LibreOffice Calc (.ods) spreadsheets via UNO, including cell operations, formulas, formatting, charts, named ranges, and data validation in libreoffice_skills.
+description: Use when creating, editing, formatting, or extracting LibreOffice Calc (.ods) spreadsheets via UNO, including cell operations, formulas, formatting, charts, named ranges, and data validation.
 ---
 
 # LibreOffice Calc
 
 ## Overview
-Use the `libreoffice_skills.calc` modules to create and edit Calc spreadsheets
+Use the `calc` modules to create and edit Calc spreadsheets
 with UNO-backed operations. Prefer the high-level functions in these modules
 instead of raw UNO calls or a CLI.
 
@@ -23,13 +23,13 @@ instead of raw UNO calls or a CLI.
 - `named_ranges.define_named_range(path, name, sheet, start_row, start_col, end_row=None, end_col=None)`
 - `validation.add_validation(path, sheet, start_row, start_col, end_row, end_col, rule)`
 - `snapshot.snapshot_area(doc_path, output_path, sheet="Sheet1", row=0, col=0, width=None, height=None, dpi=150)`
-- `libreoffice_skills.colors.resolve_color(color)`
+- `colors.resolve_color(color)`
 
 ## Usage Notes
 - Use absolute file paths for spreadsheets.
-- Ensure the bundled `libreoffice_skills` package is on `PYTHONPATH`.
-  The package is bundled inside this skill directory. Set:
-  `PYTHONPATH=<skill_base_dir>` where `<skill_base_dir>` is the base
+- Ensure the bundled modules are on `PYTHONPATH`.
+  The modules are bundled under `scripts/` in this skill directory. Set:
+  `PYTHONPATH=<skill_base_dir>/scripts` where `<skill_base_dir>` is the base
   directory reported when this skill was loaded (e.g. the path shown as
   "Base directory" in the skill output).
 - R1C1 addressing (row, col) is primary and zero-based.
@@ -43,10 +43,10 @@ instead of raw UNO calls or a CLI.
 ```python
 from pathlib import Path
 
-from libreoffice_skills.calc.core import create_spreadsheet
-from libreoffice_skills.calc.cells import set_cell
-from libreoffice_skills.calc.formatting import apply_format
-from libreoffice_skills.calc.charts import create_chart
+from calc.core import create_spreadsheet
+from calc.cells import set_cell
+from calc.formatting import apply_format
+from calc.charts import create_chart
 
 output = Path("test-output/summary.ods").resolve()
 create_spreadsheet(str(output))
@@ -80,7 +80,7 @@ Use `snapshot.snapshot_area()` to capture a cell-anchored area as PNG for
 layout verification (especially after chart placement).
 
 ```python
-from libreoffice_skills.calc.snapshot import snapshot_area
+from calc.snapshot import snapshot_area
 
 result = snapshot_area(
     str(doc_path), "/tmp/chart_area.png",
@@ -104,7 +104,7 @@ Names follow W3Schools color groups.
 
 Example:
 ```python
-from libreoffice_skills.calc.formatting import apply_format
+from calc.formatting import apply_format
 
 apply_format(str(doc_path), 0, 0, 0, {"color": "navy"})
 ```
@@ -123,5 +123,3 @@ images accumulate.
 - Misaligned chart anchors (chart not at expected position).
 - Data cells hidden behind chart objects.
 - Inconsistent formatting visible in the snapshot.
-
-

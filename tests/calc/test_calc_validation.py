@@ -2,9 +2,9 @@
 
 
 def test_add_validation_rule(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.validation import add_validation
-    from libreoffice_skills.uno_bridge import uno_context
+    from calc.core import create_spreadsheet
+    from calc.validation import add_validation
+    from uno_bridge import uno_context
 
     path = tmp_path / "validate.ods"
     create_spreadsheet(str(path))

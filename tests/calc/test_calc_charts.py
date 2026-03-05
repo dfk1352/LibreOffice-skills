@@ -2,10 +2,10 @@
 
 
 def test_create_chart(tmp_path) -> None:
-    from libreoffice_skills.calc.charts import create_chart
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.ranges import set_range
-    from libreoffice_skills.uno_bridge import uno_context
+    from calc.charts import create_chart
+    from calc.core import create_spreadsheet
+    from calc.ranges import set_range
+    from uno_bridge import uno_context
 
     path = tmp_path / "chart.ods"
     create_spreadsheet(str(path))

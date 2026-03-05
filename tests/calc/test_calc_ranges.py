@@ -2,8 +2,8 @@
 
 
 def test_set_and_get_range(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.ranges import get_range, set_range
+    from calc.core import create_spreadsheet
+    from calc.ranges import get_range, set_range
 
     path = tmp_path / "ranges.ods"
     create_spreadsheet(str(path))

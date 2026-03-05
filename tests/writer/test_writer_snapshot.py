@@ -5,12 +5,12 @@ import pytest
 
 def test_snapshot_error_hierarchy():
     """SnapshotError is a WriterSkillError; subclasses inherit."""
-    from libreoffice_skills.writer.snapshot import (
+    from writer.snapshot import (
         FilterError,
         InvalidPageError,
         SnapshotError,
     )
-    from libreoffice_skills.writer.exceptions import WriterSkillError
+    from writer.exceptions import WriterSkillError
 
     assert issubclass(SnapshotError, WriterSkillError)
     assert issubclass(InvalidPageError, SnapshotError)
@@ -19,7 +19,7 @@ def test_snapshot_error_hierarchy():
 
 def test_snapshot_result_fields():
     """SnapshotResult has file_path, width, height, dpi."""
-    from libreoffice_skills.writer.snapshot import SnapshotResult
+    from writer.snapshot import SnapshotResult
 
     result = SnapshotResult(file_path="/tmp/out.png", width=800, height=600, dpi=150)
     assert result.file_path == "/tmp/out.png"
@@ -30,8 +30,8 @@ def test_snapshot_result_fields():
 
 def test_snapshot_page_invalid_page_raises(tmp_path):
     """snapshot_page raises InvalidPageError for out-of-bounds page."""
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.snapshot import InvalidPageError, snapshot_page
+    from writer.core import create_document
+    from writer.snapshot import InvalidPageError, snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))
@@ -42,8 +42,8 @@ def test_snapshot_page_invalid_page_raises(tmp_path):
 
 def test_snapshot_page_zero_page_raises(tmp_path):
     """snapshot_page raises InvalidPageError for page=0 (must be 1-indexed)."""
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.snapshot import InvalidPageError, snapshot_page
+    from writer.core import create_document
+    from writer.snapshot import InvalidPageError, snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))
@@ -54,8 +54,8 @@ def test_snapshot_page_zero_page_raises(tmp_path):
 
 def test_snapshot_page_negative_page_raises(tmp_path):
     """snapshot_page raises InvalidPageError for negative page."""
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.snapshot import InvalidPageError, snapshot_page
+    from writer.core import create_document
+    from writer.snapshot import InvalidPageError, snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))
@@ -66,8 +66,8 @@ def test_snapshot_page_negative_page_raises(tmp_path):
 
 def test_snapshot_page_missing_doc_raises(tmp_path):
     """snapshot_page raises DocumentNotFoundError for missing file."""
-    from libreoffice_skills.writer.exceptions import DocumentNotFoundError
-    from libreoffice_skills.writer.snapshot import snapshot_page
+    from writer.exceptions import DocumentNotFoundError
+    from writer.snapshot import snapshot_page
 
     with pytest.raises(DocumentNotFoundError):
         snapshot_page(str(tmp_path / "missing.odt"), str(tmp_path / "out.png"))
@@ -75,9 +75,9 @@ def test_snapshot_page_missing_doc_raises(tmp_path):
 
 def test_snapshot_page_creates_png(tmp_path):
     """snapshot_page creates a valid PNG file with non-zero size."""
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.snapshot import snapshot_page
+    from writer.core import create_document
+    from writer.text import insert_text
+    from writer.snapshot import snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))
@@ -102,8 +102,8 @@ def test_snapshot_page_creates_png(tmp_path):
 
 def test_snapshot_page_output_path_parent_created(tmp_path):
     """snapshot_page creates parent directories if needed."""
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.snapshot import snapshot_page
+    from writer.core import create_document
+    from writer.snapshot import snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))
@@ -117,8 +117,8 @@ def test_snapshot_page_output_path_parent_created(tmp_path):
 
 def test_snapshot_page_custom_dpi(tmp_path):
     """snapshot_page respects custom dpi parameter."""
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.snapshot import snapshot_page
+    from writer.core import create_document
+    from writer.snapshot import snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))

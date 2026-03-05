@@ -2,10 +2,10 @@
 
 
 def test_format_shape_text_bold(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.formatting import format_shape_text
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.formatting import format_shape_text
+    from uno_bridge import uno_context
 
     path = tmp_path / "format_bold.odp"
     create_presentation(str(path))
@@ -40,9 +40,9 @@ def test_format_shape_text_bold(tmp_path):
 
 
 def test_set_slide_background_color(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.formatting import set_slide_background
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.core import create_presentation
+    from impress.formatting import set_slide_background
+    from uno_bridge import uno_context
 
     path = tmp_path / "background.odp"
     create_presentation(str(path))
@@ -66,10 +66,10 @@ def test_set_slide_background_color(tmp_path):
 
 
 def test_format_shape_text_alignment(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.formatting import format_shape_text
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.formatting import format_shape_text
+    from uno_bridge import uno_context
 
     path = tmp_path / "format_align.odp"
     create_presentation(str(path))
@@ -94,9 +94,9 @@ def test_format_shape_text_alignment(tmp_path):
 def test_format_shape_text_alignment_invalid_raises(tmp_path):
     import pytest
 
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.formatting import format_shape_text
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.formatting import format_shape_text
 
     path = tmp_path / "format_align_invalid.odp"
     create_presentation(str(path))
@@ -108,10 +108,10 @@ def test_format_shape_text_alignment_invalid_raises(tmp_path):
 
 
 def test_format_shape_text_alignment_case_insensitive(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.formatting import format_shape_text
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.formatting import format_shape_text
+    from uno_bridge import uno_context
 
     path = tmp_path / "format_align_case.odp"
     create_presentation(str(path))

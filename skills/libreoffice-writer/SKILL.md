@@ -1,12 +1,12 @@
 ---
 name: libreoffice-writer
-description: Use when creating, editing, formatting, or extracting LibreOffice Writer (.odt) documents via UNO, including text insertion, tables, images, metadata, and paragraph styling in libreoffice_skills.
+description: Use when creating, editing, formatting, or extracting LibreOffice Writer (.odt) documents via UNO, including text insertion, tables, images, metadata, and paragraph styling.
 ---
 
 # LibreOffice Writer
 
 ## Overview
-Use the `libreoffice_skills.writer` modules to create and edit Writer documents
+Use the `writer` modules to create and edit Writer documents
 with UNO-backed operations. Prefer the high-level functions in these modules
 instead of raw UNO calls or a CLI.
 
@@ -22,16 +22,16 @@ instead of raw UNO calls or a CLI.
 - `metadata.set_metadata(path, metadata)`
 - `metadata.get_metadata(path)`
 - `snapshot.snapshot_page(doc_path, output_path, page=1, dpi=150)`
-- `libreoffice_skills.colors.resolve_color(color)`
+- `colors.resolve_color(color)`
 
 ## Usage Notes
 - Use absolute file paths for documents and images.
-- Ensure the bundled `libreoffice_skills` package is on `PYTHONPATH`.
-  The package is bundled inside this skill directory. Set:
-  `PYTHONPATH=<skill_base_dir>` where `<skill_base_dir>` is the base
+- Ensure the bundled modules are on `PYTHONPATH`.
+  The modules are bundled under `scripts/` in this skill directory. Set:
+  `PYTHONPATH=<skill_base_dir>/scripts` where `<skill_base_dir>` is the base
   directory reported when this skill was loaded (e.g. the path shown as
   "Base directory" in the skill output).
-- Import modules directly from `libreoffice_skills.writer`; do not search for
+- Import modules directly from `writer`; do not search for
   a separate CLI or external skill registry.
 - `position` is a character index; `0` inserts at the start, `None` at the end.
 - For title/body styling, insert text, then call
@@ -42,12 +42,12 @@ instead of raw UNO calls or a CLI.
 ```python
 from pathlib import Path
 
-from libreoffice_skills.writer.core import create_document
-from libreoffice_skills.writer.formatting import apply_formatting
-from libreoffice_skills.writer.metadata import set_metadata
-from libreoffice_skills.writer.images import insert_image
-from libreoffice_skills.writer.tables import add_table
-from libreoffice_skills.writer.text import insert_text
+from writer.core import create_document
+from writer.formatting import apply_formatting
+from writer.metadata import set_metadata
+from writer.images import insert_image
+from writer.tables import add_table
+from writer.text import insert_text
 
 output = Path("test-output/report.odt").resolve()
 create_document(str(output))
@@ -99,7 +99,7 @@ insert_image(
 Use `snapshot.snapshot_page()` to capture a page as PNG for layout verification.
 
 ```python
-from libreoffice_skills.writer.snapshot import snapshot_page
+from writer.snapshot import snapshot_page
 
 result = snapshot_page(str(doc_path), "/tmp/page1.png", page=1, dpi=150)
 # result.file_path, result.width, result.height, result.dpi
@@ -118,7 +118,7 @@ Names follow W3Schools color groups.
 
 Example:
 ```python
-from libreoffice_skills.writer.formatting import apply_formatting
+from writer.formatting import apply_formatting
 
 apply_formatting(str(doc_path), {"color": "navy"})
 ```
@@ -137,5 +137,3 @@ images accumulate.
 - Misaligned objects (images not centered, tables not aligned).
 - Inconsistent spacing between paragraphs.
 - Low contrast or unreadable text.
-
-

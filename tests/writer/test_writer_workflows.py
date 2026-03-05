@@ -21,19 +21,19 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
             "snapshot_before" -> writer_snapshot_before.png
             "snapshot_after"  -> writer_snapshot_after.png
     """
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.formatting import apply_formatting
-    from libreoffice_skills.writer.images import insert_image
-    from libreoffice_skills.writer.metadata import (
+    from writer.formatting import apply_formatting
+    from writer.images import insert_image
+    from writer.metadata import (
         get_metadata,
         set_metadata,
     )
-    from libreoffice_skills.writer.snapshot import snapshot_page
-    from libreoffice_skills.writer.tables import add_table
-    from libreoffice_skills.writer.text import insert_text
+    from writer.snapshot import snapshot_page
+    from writer.tables import add_table
+    from writer.text import insert_text
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -72,7 +72,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     add_table(str(doc_path), 3, 2, table_data)
 
     img_path = output_dir / "test_image.png"
-    img = Image.new("RGB", (50, 50), color="green")
+    img = Image.new("RGB", (50, 50), color=0)
     img.save(img_path)
     insert_image(str(doc_path), str(img_path), position=None)
 
@@ -125,11 +125,11 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
 def test_multiple_operations_on_same_document(tmp_path):
     """Test that multiple operations can be performed sequentially."""
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.text import (
+    from writer.text import (
         append_text,
         insert_text,
         replace_text,
@@ -155,7 +155,7 @@ def test_multiple_operations_on_same_document(tmp_path):
 
 def test_title_and_body_are_separate_paragraphs(tmp_path):
     """Assert title paragraph is centered and body paragraph is not."""
-    from libreoffice_skills.uno_bridge import uno_context
+    from uno_bridge import uno_context
 
     outputs = run_end_to_end_workflow(tmp_path)
     doc_path = outputs["document"]
@@ -186,7 +186,7 @@ def test_title_and_body_are_separate_paragraphs(tmp_path):
 
 def test_writer_snapshot_in_workflow(tmp_path):
     """Assert snapshot_page produces a valid PNG for a Writer document."""
-    from libreoffice_skills.writer.snapshot import snapshot_page
+    from writer.snapshot import snapshot_page
 
     outputs = run_end_to_end_workflow(tmp_path)
     # The workflow already produces snapshots; verify the before snapshot

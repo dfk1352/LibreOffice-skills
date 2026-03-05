@@ -2,8 +2,8 @@
 
 
 def test_add_and_list_sheets(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.sheets import add_sheet, list_sheets
+    from calc.core import create_spreadsheet
+    from calc.sheets import add_sheet, list_sheets
 
     path = tmp_path / "sheets.ods"
     create_spreadsheet(str(path))
@@ -15,8 +15,8 @@ def test_add_and_list_sheets(tmp_path) -> None:
 
 
 def test_add_rename_remove_sheet(tmp_path) -> None:
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.sheets import (
+    from calc.core import create_spreadsheet
+    from calc.sheets import (
         add_sheet,
         list_sheets,
         remove_sheet,

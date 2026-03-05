@@ -2,8 +2,8 @@
 
 
 def test_set_and_get_cell_value(tmp_path) -> None:
-    from libreoffice_skills.calc.cells import get_cell, set_cell
-    from libreoffice_skills.calc.core import create_spreadsheet
+    from calc.cells import get_cell, set_cell
+    from calc.core import create_spreadsheet
 
     path = tmp_path / "cells.ods"
     create_spreadsheet(str(path))

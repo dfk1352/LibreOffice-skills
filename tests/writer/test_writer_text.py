@@ -4,19 +4,19 @@ import pytest
 
 
 def test_insert_text_requires_existing_document(tmp_path):
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.exceptions import DocumentNotFoundError
+    from writer.text import insert_text
+    from writer.exceptions import DocumentNotFoundError
 
     with pytest.raises(DocumentNotFoundError):
         insert_text(str(tmp_path / "missing.odt"), "Hello")
 
 
 def test_insert_text_adds_content(tmp_path):
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.text import insert_text
+    from writer.text import insert_text
 
     doc_path = tmp_path / "test_insert.odt"
     create_document(str(doc_path))
@@ -30,11 +30,11 @@ def test_insert_text_adds_content(tmp_path):
 
 
 def test_append_text_adds_to_end(tmp_path):
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.text import append_text, insert_text
+    from writer.text import append_text, insert_text
 
     doc_path = tmp_path / "test_append.odt"
     create_document(str(doc_path))
@@ -51,11 +51,11 @@ def test_append_text_adds_to_end(tmp_path):
 
 
 def test_replace_text_modifies_content(tmp_path):
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.text import insert_text, replace_text
+    from writer.text import insert_text, replace_text
 
     doc_path = tmp_path / "test_replace.odt"
     create_document(str(doc_path))
@@ -73,11 +73,11 @@ def test_replace_text_modifies_content(tmp_path):
 
 
 def test_insert_text_at_index(tmp_path):
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.text import insert_text
+    from writer.text import insert_text
 
     doc_path = tmp_path / "test_insert_index.odt"
     create_document(str(doc_path))

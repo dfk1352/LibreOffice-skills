@@ -2,7 +2,7 @@
 
 
 def test_imports_impress_package():
-    import libreoffice_skills.impress
+    import impress
 
-    assert hasattr(libreoffice_skills.impress, "create_presentation")
-    assert callable(libreoffice_skills.impress.create_presentation)
+    assert hasattr(impress, "create_presentation")
+    assert callable(impress.create_presentation)

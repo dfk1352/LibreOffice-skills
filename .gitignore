@@ -29,3 +29,10 @@ test-output/
 # OS
 .DS_Store
 Thumbs.db
+
+# development files
+.*dev*
+temp*
+
+# Agent instructions (not for public consumption)
+AGENTS.md

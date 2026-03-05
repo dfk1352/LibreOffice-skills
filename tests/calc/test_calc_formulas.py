@@ -2,9 +2,9 @@
 
 
 def test_formula_recalculation(tmp_path) -> None:
-    from libreoffice_skills.calc.cells import get_cell, set_cell
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.recalc import recalculate
+    from calc.cells import get_cell, set_cell
+    from calc.core import create_spreadsheet
+    from calc.recalc import recalculate
 
     path = tmp_path / "formula.ods"
     create_spreadsheet(str(path))

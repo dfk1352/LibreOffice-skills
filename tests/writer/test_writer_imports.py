@@ -2,9 +2,9 @@
 
 
 def test_imports_writer_package():
-    import libreoffice_skills.writer
+    import writer
 
-    assert hasattr(libreoffice_skills.writer, "create_document")
-    assert callable(libreoffice_skills.writer.create_document)
-    assert hasattr(libreoffice_skills.writer, "snapshot_page")
-    assert callable(libreoffice_skills.writer.snapshot_page)
+    assert hasattr(writer, "create_document")
+    assert callable(writer.create_document)
+    assert hasattr(writer, "snapshot_page")
+    assert callable(writer.snapshot_page)

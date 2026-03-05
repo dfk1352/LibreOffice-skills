@@ -4,9 +4,9 @@ import pytest
 
 
 def test_add_chart_returns_index(tmp_path):
-    from libreoffice_skills.impress.charts import add_chart
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.charts import add_chart
+    from impress.core import create_presentation
+    from uno_bridge import uno_context
 
     path = tmp_path / "chart.odp"
     create_presentation(str(path))
@@ -41,9 +41,9 @@ def test_add_chart_returns_index(tmp_path):
 
 
 def test_add_chart_pie(tmp_path):
-    from libreoffice_skills.impress.charts import add_chart
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.charts import add_chart
+    from impress.core import create_presentation
+    from uno_bridge import uno_context
 
     path = tmp_path / "pie.odp"
     create_presentation(str(path))
@@ -76,9 +76,9 @@ def test_add_chart_pie(tmp_path):
 
 
 def test_add_chart_rejects_invalid_type(tmp_path):
-    from libreoffice_skills.impress.charts import add_chart
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import ImpressSkillError
+    from impress.charts import add_chart
+    from impress.core import create_presentation
+    from impress.exceptions import ImpressSkillError
 
     path = tmp_path / "bad_chart.odp"
     create_presentation(str(path))

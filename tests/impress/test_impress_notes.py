@@ -4,8 +4,8 @@ import pytest
 
 
 def test_set_and_get_notes(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.notes import get_notes, set_notes
+    from impress.core import create_presentation
+    from impress.notes import get_notes, set_notes
 
     path = tmp_path / "notes.odp"
     create_presentation(str(path))
@@ -17,8 +17,8 @@ def test_set_and_get_notes(tmp_path):
 
 
 def test_get_notes_empty_by_default(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.notes import get_notes
+    from impress.core import create_presentation
+    from impress.notes import get_notes
 
     path = tmp_path / "empty_notes.odp"
     create_presentation(str(path))
@@ -29,9 +29,9 @@ def test_get_notes_empty_by_default(tmp_path):
 
 
 def test_set_notes_invalid_slide_raises(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import InvalidSlideIndexError
-    from libreoffice_skills.impress.notes import set_notes
+    from impress.core import create_presentation
+    from impress.exceptions import InvalidSlideIndexError
+    from impress.notes import set_notes
 
     path = tmp_path / "bad_notes.odp"
     create_presentation(str(path))

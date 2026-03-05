@@ -4,9 +4,9 @@ import pytest
 
 
 def test_add_table_rejects_invalid_dimensions(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.tables import add_table
-    from libreoffice_skills.writer.exceptions import InvalidTableError
+    from writer.core import create_document
+    from writer.tables import add_table
+    from writer.exceptions import InvalidTableError
 
     doc_path = tmp_path / "sample.odt"
     create_document(str(doc_path))
@@ -16,9 +16,9 @@ def test_add_table_rejects_invalid_dimensions(tmp_path):
 
 
 def test_add_empty_table(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.tables import add_table
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.tables import add_table
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_table.odt"
     create_document(str(doc_path))
@@ -40,9 +40,9 @@ def test_add_empty_table(tmp_path):
 
 
 def test_add_table_with_data(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.tables import add_table, get_cell_name
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.tables import add_table, get_cell_name
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_table_data.odt"
     create_document(str(doc_path))
@@ -71,10 +71,10 @@ def test_add_table_with_data(tmp_path):
 
 
 def test_add_table_at_index(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.tables import add_table
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.text import insert_text
+    from writer.tables import add_table
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_table_index.odt"
     create_document(str(doc_path))
@@ -97,9 +97,9 @@ def test_add_table_at_index(tmp_path):
 
 
 def test_add_table_rejects_mismatched_data(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.tables import add_table
-    from libreoffice_skills.writer.exceptions import InvalidTableError
+    from writer.core import create_document
+    from writer.tables import add_table
+    from writer.exceptions import InvalidTableError
 
     doc_path = tmp_path / "test_mismatch.odt"
     create_document(str(doc_path))
@@ -114,7 +114,7 @@ def test_add_table_rejects_mismatched_data(tmp_path):
 
 
 def test_get_cell_name():
-    from libreoffice_skills.writer.tables import get_cell_name
+    from writer.tables import get_cell_name
 
     assert get_cell_name(0, 0) == "A1"
     assert get_cell_name(0, 1) == "B1"

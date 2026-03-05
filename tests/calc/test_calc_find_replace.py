@@ -2,9 +2,9 @@
 
 
 def test_find_replace_in_calc(tmp_path):
-    from libreoffice_skills.calc.cells import get_cell, set_cell
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.find_replace import find_replace
+    from calc.cells import get_cell, set_cell
+    from calc.core import create_spreadsheet
+    from calc.find_replace import find_replace
 
     path = tmp_path / "find_replace.ods"
     create_spreadsheet(str(path))
@@ -19,10 +19,10 @@ def test_find_replace_in_calc(tmp_path):
 
 
 def test_find_replace_in_calc_scoped_to_sheet(tmp_path):
-    from libreoffice_skills.calc.cells import get_cell, set_cell
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.find_replace import find_replace
-    from libreoffice_skills.calc.sheets import add_sheet
+    from calc.cells import get_cell, set_cell
+    from calc.core import create_spreadsheet
+    from calc.find_replace import find_replace
+    from calc.sheets import add_sheet
 
     path = tmp_path / "scoped.ods"
     create_spreadsheet(str(path))

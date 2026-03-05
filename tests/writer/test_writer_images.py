@@ -4,9 +4,9 @@ import pytest
 
 
 def test_insert_image_requires_existing_file(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.images import insert_image
-    from libreoffice_skills.writer.exceptions import ImageNotFoundError
+    from writer.core import create_document
+    from writer.images import insert_image
+    from writer.exceptions import ImageNotFoundError
 
     doc_path = tmp_path / "sample.odt"
     create_document(str(doc_path))
@@ -17,16 +17,16 @@ def test_insert_image_requires_existing_file(tmp_path):
 
 def test_insert_image_adds_graphic(tmp_path):
     from PIL import Image
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.images import insert_image
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.images import insert_image
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_image.odt"
     create_document(str(doc_path))
 
     # Create a simple test image
     img_path = tmp_path / "test.png"
-    img = Image.new("RGB", (100, 100), color="red")
+    img = Image.new("RGB", (100, 100), color=0)
     img.save(img_path)
 
     # Insert image
@@ -44,16 +44,16 @@ def test_insert_image_adds_graphic(tmp_path):
 
 def test_insert_image_with_size(tmp_path):
     from PIL import Image
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.images import insert_image
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.images import insert_image
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_image_sized.odt"
     create_document(str(doc_path))
 
     # Create a simple test image
     img_path = tmp_path / "test.png"
-    img = Image.new("RGB", (100, 100), color="blue")
+    img = Image.new("RGB", (100, 100), color=0)
     img.save(img_path)
 
     # Insert image with specific size (in 1/100mm units)
@@ -76,16 +76,16 @@ def test_insert_image_with_size(tmp_path):
 
 def test_insert_image_at_index(tmp_path):
     from PIL import Image
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.images import insert_image
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.text import insert_text
+    from writer.images import insert_image
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_image_index.odt"
     create_document(str(doc_path))
 
     img_path = tmp_path / "test_index.png"
-    img = Image.new("RGB", (10, 10), color="green")
+    img = Image.new("RGB", (10, 10), color=0)
     img.save(img_path)
 
     insert_text(str(doc_path), "After", position=None)

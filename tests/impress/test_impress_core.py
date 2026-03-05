@@ -1,13 +1,12 @@
 """Tests for Impress core presentation operations."""
 
 import zipfile
-from pathlib import Path
 
 import pytest
 
 
 def test_create_presentation_creates_file(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
+    from impress.core import create_presentation
 
     output_path = tmp_path / "sample.odp"
     create_presentation(str(output_path))
@@ -17,7 +16,7 @@ def test_create_presentation_creates_file(tmp_path):
 
 
 def test_create_presentation_is_valid_odp(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
+    from impress.core import create_presentation
 
     output_path = tmp_path / "valid.odp"
     create_presentation(str(output_path))
@@ -29,7 +28,7 @@ def test_create_presentation_is_valid_odp(tmp_path):
 
 
 def test_get_slide_count_returns_one_for_new_presentation(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         get_slide_count,
     )
@@ -41,7 +40,7 @@ def test_get_slide_count_returns_one_for_new_presentation(tmp_path):
 
 
 def test_export_presentation_pdf(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         export_presentation,
     )
@@ -59,7 +58,7 @@ def test_export_presentation_pdf(tmp_path):
 
 
 def test_export_presentation_pptx(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         export_presentation,
     )
@@ -80,11 +79,11 @@ def test_export_presentation_pptx(tmp_path):
 
 
 def test_export_presentation_rejects_unknown_format(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         export_presentation,
     )
-    from libreoffice_skills.impress.exceptions import ImpressSkillError
+    from impress.exceptions import ImpressSkillError
 
     path = tmp_path / "export.odp"
     create_presentation(str(path))

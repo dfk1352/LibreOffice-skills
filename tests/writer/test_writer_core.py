@@ -1,11 +1,10 @@
 """Test Writer core document operations."""
 
 import zipfile
-from pathlib import Path
 
 
 def test_create_document_requires_output_path(tmp_path):
-    from libreoffice_skills.writer.core import create_document
+    from writer.core import create_document
 
     output_path = tmp_path / "sample.odt"
     create_document(str(output_path))
@@ -23,11 +22,11 @@ def test_create_document_requires_output_path(tmp_path):
 
 
 def test_read_document_text(tmp_path):
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.text import insert_text
+    from writer.text import insert_text
 
     output_path = tmp_path / "test_read.odt"
     create_document(str(output_path))
@@ -43,8 +42,8 @@ def test_read_document_text(tmp_path):
 
 
 def test_read_nonexistent_document(tmp_path):
-    from libreoffice_skills.writer.core import read_document_text
-    from libreoffice_skills.writer.exceptions import WriterSkillError
+    from writer.core import read_document_text
+    from writer.exceptions import WriterSkillError
     import pytest
 
     with pytest.raises(WriterSkillError):
@@ -52,7 +51,7 @@ def test_read_nonexistent_document(tmp_path):
 
 
 def test_export_writer_pdf(tmp_path):
-    from libreoffice_skills.writer.core import create_document, export_document
+    from writer.core import create_document, export_document
 
     path = tmp_path / "writer.odt"
     output = tmp_path / "writer.pdf"

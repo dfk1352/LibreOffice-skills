@@ -4,9 +4,9 @@ import pytest
 
 
 def test_apply_formatting_rejects_unknown_keys(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.formatting import apply_formatting
-    from libreoffice_skills.writer.exceptions import InvalidFormattingError
+    from writer.core import create_document
+    from writer.formatting import apply_formatting
+    from writer.exceptions import InvalidFormattingError
 
     doc_path = tmp_path / "sample.odt"
     create_document(str(doc_path))
@@ -16,10 +16,10 @@ def test_apply_formatting_rejects_unknown_keys(tmp_path):
 
 
 def test_apply_character_formatting(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.formatting import apply_formatting
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.text import insert_text
+    from writer.formatting import apply_formatting
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_char_format.odt"
     create_document(str(doc_path))
@@ -43,10 +43,10 @@ def test_apply_character_formatting(tmp_path):
 
 
 def test_apply_paragraph_formatting(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.formatting import apply_formatting
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.text import insert_text
+    from writer.formatting import apply_formatting
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_para_format.odt"
     create_document(str(doc_path))
@@ -68,9 +68,9 @@ def test_apply_paragraph_formatting(tmp_path):
 
 
 def test_apply_paragraph_formatting_invalid_align(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.formatting import apply_formatting
-    from libreoffice_skills.writer.exceptions import InvalidFormattingError
+    from writer.core import create_document
+    from writer.formatting import apply_formatting
+    from writer.exceptions import InvalidFormattingError
 
     doc_path = tmp_path / "test_para_bad_align.odt"
     create_document(str(doc_path))
@@ -80,10 +80,10 @@ def test_apply_paragraph_formatting_invalid_align(tmp_path):
 
 
 def test_apply_font_properties(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.text import insert_text
-    from libreoffice_skills.writer.formatting import apply_formatting
-    from libreoffice_skills.uno_bridge import uno_context
+    from writer.core import create_document
+    from writer.text import insert_text
+    from writer.formatting import apply_formatting
+    from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_font.odt"
     create_document(str(doc_path))

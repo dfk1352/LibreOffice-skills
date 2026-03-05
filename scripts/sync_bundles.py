@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Sync the libreoffice_skills bundles from src/ into each skill directory.
+"""Sync the bundled skill modules into each skill directory.
 
 Each skill directory under skills/ contains a bundled copy of the
-libreoffice_skills Python package so that agents can use it directly
-after installing the skill via `npx skills add dfk1352/LibreOffice-skills`.
+LibreOffice skill modules under a scripts/ directory so that agents can use
+them directly after installing the skill via
+`npx skills add dfk1352/LibreOffice-skills`.
 
-Run this script whenever src/libreoffice_skills/ is updated:
+Run this script whenever src/ is updated:
 
     python scripts/sync_bundles.py
 
 The bundles are app-specific — only the relevant submodule is copied:
-  - skills/libreoffice-writer/  ← shared + writer/
-  - skills/libreoffice-calc/    ← shared + calc/
-  - skills/libreoffice-impress/ ← shared + impress/
+  - skills/libreoffice-writer/scripts/  ← shared + writer/
+  - skills/libreoffice-calc/scripts/    ← shared + calc/
+  - skills/libreoffice-impress/scripts/ ← shared + impress/
 """
 
 from __future__ import annotations
@@ -22,15 +23,17 @@ import sys
 from pathlib import Path
 
 
-# Shared files present in every bundle (relative to src/libreoffice_skills/).
+BUNDLE_DIR = "scripts"
+
+# Shared files present in every bundle (relative to src/).
+
 SHARED_FILES = [
-    "__init__.py",
     "uno_bridge.py",
     "exceptions.py",
     "colors.py",
 ]
 
-# Map: skill directory name → app subpackage name inside libreoffice_skills/.
+# Map: skill directory name → app subpackage name.
 SKILL_SUBPACKAGE: dict[str, str] = {
     "libreoffice-writer": "writer",
     "libreoffice-calc": "calc",
@@ -44,11 +47,12 @@ def _copy_file(src: Path, dst: Path) -> None:
 
 
 def sync_bundle(src_root: Path, skill_dir: Path, subpackage: str) -> None:
-    dest_root = skill_dir / "libreoffice_skills"
+    dest_root = skill_dir / BUNDLE_DIR
 
     # Remove stale bundle to avoid accumulating deleted files.
     if dest_root.exists():
         shutil.rmtree(dest_root)
+    dest_root.mkdir(parents=True, exist_ok=True)
 
     # Copy shared top-level files.
     for filename in SHARED_FILES:
@@ -74,7 +78,7 @@ def sync_bundle(src_root: Path, skill_dir: Path, subpackage: str) -> None:
 
 def main() -> int:
     repo_root = Path(__file__).parent.parent
-    src_root = repo_root / "src" / "libreoffice_skills"
+    src_root = repo_root / "src"
     skills_root = repo_root / "skills"
 
     if not src_root.is_dir():

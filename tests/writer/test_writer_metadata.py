@@ -4,9 +4,9 @@ import pytest
 
 
 def test_set_metadata_rejects_empty_key(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.metadata import set_metadata
-    from libreoffice_skills.writer.exceptions import InvalidMetadataError
+    from writer.core import create_document
+    from writer.metadata import set_metadata
+    from writer.exceptions import InvalidMetadataError
 
     doc_path = tmp_path / "sample.odt"
     create_document(str(doc_path))
@@ -16,8 +16,8 @@ def test_set_metadata_rejects_empty_key(tmp_path):
 
 
 def test_set_and_get_metadata(tmp_path):
-    from libreoffice_skills.writer.core import create_document
-    from libreoffice_skills.writer.metadata import (
+    from writer.core import create_document
+    from writer.metadata import (
         set_metadata,
         get_metadata,
     )

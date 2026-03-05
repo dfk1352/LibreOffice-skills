@@ -4,11 +4,11 @@ import pytest
 
 
 def test_add_slide_appends_by_default(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         get_slide_count,
     )
-    from libreoffice_skills.impress.slides import add_slide
+    from impress.slides import add_slide
 
     path = tmp_path / "slides.odp"
     create_presentation(str(path))
@@ -19,12 +19,12 @@ def test_add_slide_appends_by_default(tmp_path):
 
 
 def test_add_slide_with_layout(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         get_slide_count,
     )
-    from libreoffice_skills.impress.slides import add_slide
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.slides import add_slide
+    from uno_bridge import uno_context
 
     path = tmp_path / "layout.odp"
     create_presentation(str(path))
@@ -56,9 +56,9 @@ def test_add_slide_with_layout(tmp_path):
 
 
 def test_add_slide_rejects_invalid_layout(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import InvalidLayoutError
-    from libreoffice_skills.impress.slides import add_slide
+    from impress.core import create_presentation
+    from impress.exceptions import InvalidLayoutError
+    from impress.slides import add_slide
 
     path = tmp_path / "bad_layout.odp"
     create_presentation(str(path))
@@ -68,11 +68,11 @@ def test_add_slide_rejects_invalid_layout(tmp_path):
 
 
 def test_delete_slide(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         get_slide_count,
     )
-    from libreoffice_skills.impress.slides import add_slide, delete_slide
+    from impress.slides import add_slide, delete_slide
 
     path = tmp_path / "delete.odp"
     create_presentation(str(path))
@@ -84,9 +84,9 @@ def test_delete_slide(tmp_path):
 
 
 def test_delete_slide_rejects_invalid_index(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import InvalidSlideIndexError
-    from libreoffice_skills.impress.slides import delete_slide
+    from impress.core import create_presentation
+    from impress.exceptions import InvalidSlideIndexError
+    from impress.slides import delete_slide
 
     path = tmp_path / "bad_index.odp"
     create_presentation(str(path))
@@ -96,10 +96,10 @@ def test_delete_slide_rejects_invalid_index(tmp_path):
 
 
 def test_move_slide(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.slides import add_slide, move_slide
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.slides import get_slide_inventory
+    from impress.core import create_presentation
+    from impress.slides import add_slide, move_slide
+    from impress.content import add_text_box
+    from impress.slides import get_slide_inventory
 
     path = tmp_path / "move.odp"
     create_presentation(str(path))
@@ -117,11 +117,11 @@ def test_move_slide(tmp_path):
 
 
 def test_duplicate_slide(tmp_path):
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         get_slide_count,
     )
-    from libreoffice_skills.impress.slides import duplicate_slide
+    from impress.slides import duplicate_slide
 
     path = tmp_path / "dup.odp"
     create_presentation(str(path))
@@ -132,9 +132,9 @@ def test_duplicate_slide(tmp_path):
 
 
 def test_get_slide_inventory_returns_dict(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.slides import get_slide_inventory
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.slides import get_slide_inventory
 
     path = tmp_path / "inventory.odp"
     create_presentation(str(path))

@@ -40,40 +40,40 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
             "export_pptx"       -> presentation.pptx
             "slide_images"      -> list stored in output_dir/slides/
     """
-    from libreoffice_skills.impress.charts import add_chart
-    from libreoffice_skills.impress.content import (
+    from impress.charts import add_chart
+    from impress.content import (
         add_image,
         add_shape,
         add_text_box,
         set_body,
         set_title,
     )
-    from libreoffice_skills.impress.core import (
+    from impress.core import (
         create_presentation,
         export_presentation,
         get_slide_count,
     )
-    from libreoffice_skills.impress.find_replace import find_replace
-    from libreoffice_skills.impress.formatting import (
+    from impress.find_replace import find_replace
+    from impress.formatting import (
         format_shape_text,
         set_slide_background,
     )
-    from libreoffice_skills.impress.master import (
+    from impress.master import (
         apply_master_page,
         import_master_from_template,
         list_master_pages,
     )
-    from libreoffice_skills.impress.media import add_audio, add_video
-    from libreoffice_skills.impress.notes import get_notes, set_notes
-    from libreoffice_skills.impress.slides import (
+    from impress.media import add_audio, add_video
+    from impress.notes import get_notes, set_notes
+    from impress.slides import (
         add_slide,
         delete_slide,
         duplicate_slide,
         get_slide_inventory,
         move_slide,
     )
-    from libreoffice_skills.impress.snapshot import snapshot_slide
-    from libreoffice_skills.impress.tables import (
+    from impress.snapshot import snapshot_slide
+    from impress.tables import (
         add_table,
         format_table_cell,
         set_table_cell,
@@ -210,7 +210,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     imported_name = import_master_from_template(str(pres_path), str(template_path))
     assert isinstance(imported_name, str)
 
-    from libreoffice_skills.impress.master import set_master_background
+    from impress.master import set_master_background
 
     set_master_background(str(pres_path), imported_name, "lightsteelblue")
     apply_master_page(str(pres_path), imported_name)
@@ -327,9 +327,9 @@ def test_workflow_content_assertions(tmp_path):
         - Speaker notes are present.
         - All exported files exist.
     """
-    from libreoffice_skills.impress.core import get_slide_count
-    from libreoffice_skills.impress.notes import get_notes
-    from libreoffice_skills.impress.slides import get_slide_inventory
+    from impress.core import get_slide_count
+    from impress.notes import get_notes
+    from impress.slides import get_slide_inventory
 
     outputs = run_end_to_end_workflow(tmp_path)
     pres = str(outputs["presentation"])

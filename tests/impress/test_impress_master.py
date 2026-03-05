@@ -4,8 +4,8 @@ import pytest
 
 
 def test_list_master_pages(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.master import list_master_pages
+    from impress.core import create_presentation
+    from impress.master import list_master_pages
 
     path = tmp_path / "master.odp"
     create_presentation(str(path))
@@ -21,13 +21,13 @@ def test_list_master_pages(tmp_path):
 
 
 def test_apply_master_page(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.master import (
+    from impress.core import create_presentation
+    from impress.master import (
         apply_master_page,
         list_master_pages,
     )
-    from libreoffice_skills.impress.slides import add_slide
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.slides import add_slide
+    from uno_bridge import uno_context
 
     path = tmp_path / "apply_master.odp"
     create_presentation(str(path))
@@ -53,9 +53,9 @@ def test_apply_master_page(tmp_path):
 
 
 def test_apply_master_page_invalid_name_raises(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import MasterNotFoundError
-    from libreoffice_skills.impress.master import apply_master_page
+    from impress.core import create_presentation
+    from impress.exceptions import MasterNotFoundError
+    from impress.master import apply_master_page
 
     path = tmp_path / "bad_master.odp"
     create_presentation(str(path))
@@ -65,13 +65,13 @@ def test_apply_master_page_invalid_name_raises(tmp_path):
 
 
 def test_import_master_from_template(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.master import (
+    from impress.core import create_presentation
+    from impress.master import (
         import_master_from_template,
         list_master_pages,
         set_master_background,
     )
-    from libreoffice_skills.uno_bridge import uno_context
+    from uno_bridge import uno_context
 
     target_path = tmp_path / "target.odp"
     template_path = tmp_path / "template.odp"

@@ -51,10 +51,11 @@ Or with [`openskills`](https://github.com/numman-ali/openskills):
 npx openskills install dfk1352/LibreOffice-skills
 ```
 
-Each skill folder bundles the `libreoffice_skills` Python package alongside
-its `SKILL.md`. After installation, add the skill's directory to `PYTHONPATH`
-so that `import libreoffice_skills` resolves — the agent's skill tool reports
-the base directory automatically.
+Each skill folder bundles the LibreOffice skill modules under `scripts/`
+alongside its `SKILL.md`. After installation, add the skill's `scripts/`
+directory to `PYTHONPATH` so that `import writer`, `import calc`, or
+`import impress` resolves — the agent's skill tool reports the base directory
+automatically.
 
 ## What's Included
 
@@ -111,7 +112,7 @@ uv run mypy src/
 ## Project Structure
 
 ```
-src/libreoffice_skills/
+src/
   uno_bridge.py          # Headless LibreOffice connection
   colors.py              # Shared color name resolution
   exceptions.py          # Base exception hierarchy
@@ -122,13 +123,13 @@ tests/                   # Unit and integration tests
 skills/
   libreoffice-writer/
     SKILL.md             # Skill definition with YAML frontmatter
-    libreoffice_skills/  # Bundled Python package (writer + shared)
+    scripts/               # Bundled modules (writer + shared)
   libreoffice-calc/
     SKILL.md
-    libreoffice_skills/  # Bundled Python package (calc + shared)
+    scripts/               # Bundled modules (calc + shared)
   libreoffice-impress/
     SKILL.md
-    libreoffice_skills/  # Bundled Python package (impress + shared)
+    scripts/               # Bundled modules (impress + shared)
 scripts/
   package_skill.py       # Zip a skill directory into a .skill archive
   sync_bundles.py        # Re-sync bundled packages from src/ into skills/

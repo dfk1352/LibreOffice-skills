@@ -1,12 +1,12 @@
 ---
 name: libreoffice-impress
-description: Use when creating, editing, formatting, or extracting LibreOffice Impress (.odp) presentations via UNO, including slides, content placement, tables, charts, media, notes, master pages, find & replace, and snapshots in libreoffice_skills.
+description: Use when creating, editing, formatting, or extracting LibreOffice Impress (.odp) presentations via UNO, including slides, content placement, tables, charts, media, notes, master pages, find & replace, and snapshots.
 ---
 
 # LibreOffice Impress
 
 ## Overview
-Use the `libreoffice_skills.impress` modules to create and edit Impress
+Use the `impress` modules to create and edit Impress
 presentations with UNO-backed operations. Prefer these high-level functions
 instead of raw UNO calls or a CLI.
 
@@ -40,13 +40,13 @@ instead of raw UNO calls or a CLI.
 - `master.set_master_background(path, master_name, color)`
 - `find_replace.find_replace(path, find, replace, match_case=False, whole_word=False)`
 - `snapshot.snapshot_slide(doc_path, slide_index, output_path, width=1280, height=720)`
-- `libreoffice_skills.colors.resolve_color(color)`
+- `colors.resolve_color(color)`
 
 ## Usage Notes
 - Use absolute file paths for presentations and media assets.
-- Ensure the bundled `libreoffice_skills` package is on `PYTHONPATH`.
-  The package is bundled inside this skill directory. Set:
-  `PYTHONPATH=<skill_base_dir>` where `<skill_base_dir>` is the base
+- Ensure the bundled modules are on `PYTHONPATH`.
+  The modules are bundled under `scripts/` in this skill directory. Set:
+  `PYTHONPATH=<skill_base_dir>/scripts` where `<skill_base_dir>` is the base
   directory reported when this skill was loaded (e.g. the path shown as
   "Base directory" in the skill output).
 - Slide indices are zero-based.
@@ -62,10 +62,10 @@ instead of raw UNO calls or a CLI.
 ```python
 from pathlib import Path
 
-from libreoffice_skills.impress.core import create_presentation, export_presentation
-from libreoffice_skills.impress.content import add_text_box, add_shape
-from libreoffice_skills.impress.formatting import format_shape_text, set_slide_background
-from libreoffice_skills.impress.slides import add_slide
+from impress.core import create_presentation, export_presentation
+from impress.content import add_text_box, add_shape
+from impress.formatting import format_shape_text, set_slide_background
+from impress.slides import add_slide
 
 output = Path("test-output/demo.odp").resolve()
 create_presentation(str(output))
@@ -106,7 +106,7 @@ Names follow W3Schools color groups.
 
 Example:
 ```python
-from libreoffice_skills.impress.formatting import set_slide_background
+from impress.formatting import set_slide_background
 
 set_slide_background(str(doc_path), 0, "navy")
 ```
@@ -117,7 +117,7 @@ Use `snapshot.snapshot_slide()` to capture a slide as PNG for layout
 verification. PNG export uses LibreOffice's CLI conversion pipeline.
 
 ```python
-from libreoffice_skills.impress.snapshot import snapshot_slide
+from impress.snapshot import snapshot_slide
 
 result = snapshot_slide(str(doc_path), 0, "/tmp/slide1.png")
 # result.file_path, result.width, result.height, result.dpi
@@ -142,5 +142,3 @@ images accumulate.
 - Using 1-based slide indices.
 - Forgetting to create the document before inserting content.
 - Passing uppercase layout or shape type names.
-
-

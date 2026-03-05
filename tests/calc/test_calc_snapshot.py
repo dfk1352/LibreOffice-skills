@@ -5,13 +5,13 @@ import pytest
 
 def test_snapshot_error_hierarchy():
     """SnapshotError is a CalcSkillError; subclasses inherit."""
-    from libreoffice_skills.calc.snapshot import (
+    from calc.snapshot import (
         FilterError,
         InvalidAreaError,
         InvalidSheetError,
         SnapshotError,
     )
-    from libreoffice_skills.calc.exceptions import CalcSkillError
+    from calc.exceptions import CalcSkillError
 
     assert issubclass(SnapshotError, CalcSkillError)
     assert issubclass(InvalidSheetError, SnapshotError)
@@ -21,7 +21,7 @@ def test_snapshot_error_hierarchy():
 
 def test_snapshot_result_fields():
     """SnapshotResult has file_path, width, height, dpi."""
-    from libreoffice_skills.calc.snapshot import SnapshotResult
+    from calc.snapshot import SnapshotResult
 
     result = SnapshotResult(file_path="/tmp/out.png", width=800, height=600, dpi=150)
     assert result.file_path == "/tmp/out.png"
@@ -32,8 +32,8 @@ def test_snapshot_result_fields():
 
 def test_snapshot_area_invalid_sheet_raises(tmp_path):
     """snapshot_area raises InvalidSheetError for nonexistent sheet."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import InvalidSheetError, snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import InvalidSheetError, snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -44,8 +44,8 @@ def test_snapshot_area_invalid_sheet_raises(tmp_path):
 
 def test_snapshot_area_negative_row_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative row."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import InvalidAreaError, snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -56,8 +56,8 @@ def test_snapshot_area_negative_row_raises(tmp_path):
 
 def test_snapshot_area_negative_col_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative col."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import InvalidAreaError, snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -68,8 +68,8 @@ def test_snapshot_area_negative_col_raises(tmp_path):
 
 def test_snapshot_area_negative_width_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative width."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import InvalidAreaError, snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -80,8 +80,8 @@ def test_snapshot_area_negative_width_raises(tmp_path):
 
 def test_snapshot_area_negative_height_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative height."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import InvalidAreaError, snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -92,8 +92,8 @@ def test_snapshot_area_negative_height_raises(tmp_path):
 
 def test_snapshot_area_missing_doc_raises(tmp_path):
     """snapshot_area raises DocumentNotFoundError for missing file."""
-    from libreoffice_skills.calc.exceptions import CalcSkillError
-    from libreoffice_skills.calc.snapshot import snapshot_area
+    from calc.exceptions import CalcSkillError
+    from calc.snapshot import snapshot_area
 
     with pytest.raises(CalcSkillError):
         snapshot_area(str(tmp_path / "missing.ods"), str(tmp_path / "out.png"))
@@ -101,9 +101,9 @@ def test_snapshot_area_missing_doc_raises(tmp_path):
 
 def test_snapshot_area_creates_png(tmp_path):
     """snapshot_area creates a valid PNG file with non-zero size."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.cells import set_cell
-    from libreoffice_skills.calc.snapshot import snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.cells import set_cell
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -129,8 +129,8 @@ def test_snapshot_area_creates_png(tmp_path):
 
 def test_snapshot_area_output_path_parent_created(tmp_path):
     """snapshot_area creates parent directories if needed."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -144,8 +144,8 @@ def test_snapshot_area_output_path_parent_created(tmp_path):
 
 def test_snapshot_area_custom_dpi(tmp_path):
     """snapshot_area respects custom dpi parameter."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.snapshot import snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -159,9 +159,9 @@ def test_snapshot_area_custom_dpi(tmp_path):
 
 def test_snapshot_area_with_cell_anchor(tmp_path):
     """snapshot_area with row/col captures from the specified cell position."""
-    from libreoffice_skills.calc.core import create_spreadsheet
-    from libreoffice_skills.calc.cells import set_cell
-    from libreoffice_skills.calc.snapshot import snapshot_area
+    from calc.core import create_spreadsheet
+    from calc.cells import set_cell
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))

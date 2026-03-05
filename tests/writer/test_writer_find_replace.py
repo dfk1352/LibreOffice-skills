@@ -2,12 +2,12 @@
 
 
 def test_find_replace_in_writer(tmp_path):
-    from libreoffice_skills.writer.core import (
+    from writer.core import (
         create_document,
         read_document_text,
     )
-    from libreoffice_skills.writer.find_replace import find_replace
-    from libreoffice_skills.writer.text import insert_text
+    from writer.find_replace import find_replace
+    from writer.text import insert_text
 
     path = tmp_path / "find_replace.odt"
     create_document(str(path))

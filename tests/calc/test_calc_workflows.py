@@ -22,21 +22,21 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
             "snapshot_before" -> calc_snapshot_before.png
             "snapshot_after"  -> calc_snapshot_after.png
     """
-    from libreoffice_skills.calc.charts import create_chart
-    from libreoffice_skills.calc.cells import get_cell, set_cell
-    from libreoffice_skills.calc.core import create_spreadsheet, export_spreadsheet
-    from libreoffice_skills.calc.formatting import apply_format
-    from libreoffice_skills.calc.named_ranges import define_named_range
-    from libreoffice_skills.calc.ranges import get_range, set_range
-    from libreoffice_skills.calc.recalc import recalculate
-    from libreoffice_skills.calc.sheets import (
+    from calc.charts import create_chart
+    from calc.cells import get_cell, set_cell
+    from calc.core import create_spreadsheet, export_spreadsheet
+    from calc.formatting import apply_format
+    from calc.named_ranges import define_named_range
+    from calc.ranges import get_range, set_range
+    from calc.recalc import recalculate
+    from calc.sheets import (
         add_sheet,
         list_sheets,
         remove_sheet,
         rename_sheet,
     )
-    from libreoffice_skills.calc.snapshot import snapshot_area
-    from libreoffice_skills.calc.validation import add_validation
+    from calc.snapshot import snapshot_area
+    from calc.validation import add_validation
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -133,7 +133,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
 def test_calc_snapshot_in_workflow(tmp_path):
     """Assert snapshot_area produces a valid PNG for a Calc document."""
-    from libreoffice_skills.calc.snapshot import snapshot_area
+    from calc.snapshot import snapshot_area
 
     outputs = run_calc_end_to_end_workflow(tmp_path)
     # The workflow already produces snapshots; verify the before snapshot

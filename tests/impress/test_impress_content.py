@@ -4,9 +4,9 @@ import pytest
 
 
 def test_set_title_on_title_slide(tmp_path):
-    from libreoffice_skills.impress.content import set_title
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.slides import add_slide, get_slide_inventory
+    from impress.content import set_title
+    from impress.core import create_presentation
+    from impress.slides import add_slide, get_slide_inventory
 
     path = tmp_path / "title.odp"
     create_presentation(str(path))
@@ -20,9 +20,9 @@ def test_set_title_on_title_slide(tmp_path):
 
 
 def test_set_body_on_content_slide(tmp_path):
-    from libreoffice_skills.impress.content import set_body
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.slides import add_slide, get_slide_inventory
+    from impress.content import set_body
+    from impress.core import create_presentation
+    from impress.slides import add_slide, get_slide_inventory
 
     path = tmp_path / "body.odp"
     create_presentation(str(path))
@@ -36,9 +36,9 @@ def test_set_body_on_content_slide(tmp_path):
 
 
 def test_add_text_box_returns_shape_index(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.slides import get_slide_inventory
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.slides import get_slide_inventory
 
     path = tmp_path / "textbox.odp"
     create_presentation(str(path))
@@ -53,9 +53,9 @@ def test_add_text_box_returns_shape_index(tmp_path):
 
 
 def test_add_text_box_roundtrip(tmp_path):
-    from libreoffice_skills.impress.content import add_text_box
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.slides import get_slide_inventory
+    from impress.content import add_text_box
+    from impress.core import create_presentation
+    from impress.slides import get_slide_inventory
 
     path = tmp_path / "textbox_rt.odp"
     create_presentation(str(path))
@@ -70,9 +70,9 @@ def test_add_text_box_roundtrip(tmp_path):
 def test_add_image_returns_shape_index(tmp_path):
     from PIL import Image
 
-    from libreoffice_skills.impress.content import add_image
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.content import add_image
+    from impress.core import create_presentation
+    from uno_bridge import uno_context
 
     path = tmp_path / "image.odp"
     create_presentation(str(path))
@@ -100,8 +100,8 @@ def test_add_image_returns_shape_index(tmp_path):
 
 
 def test_add_image_missing_file_raises(tmp_path):
-    from libreoffice_skills.impress.content import add_image
-    from libreoffice_skills.impress.core import create_presentation
+    from impress.content import add_image
+    from impress.core import create_presentation
 
     path = tmp_path / "image_missing.odp"
     create_presentation(str(path))
@@ -111,9 +111,9 @@ def test_add_image_missing_file_raises(tmp_path):
 
 
 def test_add_shape_returns_index(tmp_path):
-    from libreoffice_skills.impress.content import add_shape
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.content import add_shape
+    from impress.core import create_presentation
+    from uno_bridge import uno_context
 
     path = tmp_path / "shape.odp"
     create_presentation(str(path))
@@ -147,9 +147,9 @@ def test_add_shape_returns_index(tmp_path):
 
 
 def test_add_shape_rejects_invalid_type(tmp_path):
-    from libreoffice_skills.impress.content import add_shape
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.exceptions import InvalidShapeError
+    from impress.content import add_shape
+    from impress.core import create_presentation
+    from impress.exceptions import InvalidShapeError
 
     path = tmp_path / "bad_shape.odp"
     create_presentation(str(path))

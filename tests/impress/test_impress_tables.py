@@ -2,9 +2,9 @@
 
 
 def test_add_table_returns_index(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.tables import add_table
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.core import create_presentation
+    from impress.tables import add_table
+    from uno_bridge import uno_context
 
     path = tmp_path / "table.odp"
     create_presentation(str(path))
@@ -27,9 +27,9 @@ def test_add_table_returns_index(tmp_path):
 
 
 def test_add_table_with_data(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.tables import add_table, set_table_cell
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.core import create_presentation
+    from impress.tables import add_table
+    from uno_bridge import uno_context
 
     path = tmp_path / "table_data.odp"
     create_presentation(str(path))
@@ -58,9 +58,9 @@ def test_add_table_with_data(tmp_path):
 
 
 def test_set_table_cell(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.tables import add_table, set_table_cell
-    from libreoffice_skills.uno_bridge import uno_context
+    from impress.core import create_presentation
+    from impress.tables import add_table, set_table_cell
+    from uno_bridge import uno_context
 
     path = tmp_path / "set_cell.odp"
     create_presentation(str(path))
@@ -86,13 +86,13 @@ def test_set_table_cell(tmp_path):
 
 
 def test_format_table_cell(tmp_path):
-    from libreoffice_skills.impress.core import create_presentation
-    from libreoffice_skills.impress.tables import (
+    from impress.core import create_presentation
+    from impress.tables import (
         add_table,
         format_table_cell,
         set_table_cell,
     )
-    from libreoffice_skills.uno_bridge import uno_context
+    from uno_bridge import uno_context
 
     path = tmp_path / "format_cell.odp"
     create_presentation(str(path))
