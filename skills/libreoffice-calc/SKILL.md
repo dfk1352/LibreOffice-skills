@@ -97,18 +97,6 @@ result = snapshot_area(
 - `width`, `height`: Pixel dimensions (None for default extent).
 - `dpi`: Export resolution (default: 150).
 
-## Color Names
-
-Formatting functions accept both `0xRRGGBB` integers and named colors.
-Names follow W3Schools color groups.
-
-Example:
-```python
-from calc.formatting import apply_format
-
-apply_format(str(doc_path), 0, 0, 0, {"color": "navy"})
-```
-
 **When to snapshot:**
 - After inserting charts to verify placement and sizing.
 - After applying formatting to confirm visual layout.

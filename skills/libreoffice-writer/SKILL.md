@@ -111,18 +111,6 @@ result = snapshot_page(str(doc_path), "/tmp/page1.png", page=1, dpi=150)
 - `page`: 1-indexed page number (default: 1).
 - `dpi`: Export resolution (default: 150).
 
-## Color Names
-
-Formatting functions accept both `0xRRGGBB` integers and named colors.
-Names follow W3Schools color groups.
-
-Example:
-```python
-from writer.formatting import apply_formatting
-
-apply_formatting(str(doc_path), {"color": "navy"})
-```
-
 **When to snapshot:**
 - After inserting images to confirm alignment.
 - After applying formatting to verify layout.

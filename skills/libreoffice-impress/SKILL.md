@@ -99,18 +99,6 @@ set_slide_background(str(output), 1, "white")
 export_presentation(str(output), str(output.with_suffix(".pdf")), "pdf")
 ```
 
-## Color Names
-
-Formatting functions accept both `0xRRGGBB` integers and named colors.
-Names follow W3Schools color groups.
-
-Example:
-```python
-from impress.formatting import set_slide_background
-
-set_slide_background(str(doc_path), 0, "navy")
-```
-
 ## Visual Snapshots
 
 Use `snapshot.snapshot_slide()` to capture a slide as PNG for layout
