@@ -34,7 +34,7 @@ def test_append_text_adds_to_end(tmp_path):
         create_document,
         read_document_text,
     )
-    from writer.text import append_text, insert_text
+    from writer.text import insert_text
 
     doc_path = tmp_path / "test_append.odt"
     create_document(str(doc_path))
@@ -43,7 +43,7 @@ def test_append_text_adds_to_end(tmp_path):
     insert_text(str(doc_path), "First line")
 
     # Append more text
-    append_text(str(doc_path), "\nSecond line")
+    insert_text(str(doc_path), "\nSecond line", position=None)
 
     # Verify order is preserved
     content = read_document_text(str(doc_path))

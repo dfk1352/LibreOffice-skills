@@ -130,7 +130,6 @@ def test_multiple_operations_on_same_document(tmp_path):
         read_document_text,
     )
     from writer.text import (
-        append_text,
         insert_text,
         replace_text,
     )
@@ -140,8 +139,8 @@ def test_multiple_operations_on_same_document(tmp_path):
 
     # Perform multiple operations
     insert_text(str(doc_path), "First line\n")
-    append_text(str(doc_path), "Second line\n")
-    append_text(str(doc_path), "Third line\n")
+    insert_text(str(doc_path), "Second line\n", position=None)
+    insert_text(str(doc_path), "Third line\n", position=None)
 
     # Replace text
     replace_text(str(doc_path), "Second", "SECOND")

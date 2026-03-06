@@ -14,7 +14,6 @@ instead of raw UNO calls or a CLI.
 - `core.create_document(path)`
 - `core.read_document_text(path)`
 - `text.insert_text(path, text, position=None)`
-- `text.append_text(path, text)`
 - `text.replace_text(path, old, new)`
 - `formatting.apply_formatting(path, formatting, selection="all")`
 - `tables.add_table(path, rows, cols, data=None, position=None)`

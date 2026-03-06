@@ -54,19 +54,6 @@ def insert_text(path: str, text: str, position: int | None = None) -> None:
             doc.close(True)
 
 
-def append_text(path: str, text: str) -> None:
-    """Append text to the end of a Writer document.
-
-    Args:
-        path: Path to the document file.
-        text: Text content to append.
-
-    Raises:
-        DocumentNotFoundError: If the document does not exist.
-    """
-    insert_text(path, text, position=None)
-
-
 def replace_text(path: str, old: str, new: str) -> None:
     """Replace all occurrences of text in a Writer document.
 
