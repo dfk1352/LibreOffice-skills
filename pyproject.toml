@@ -15,7 +15,7 @@ dev = [
     "pytest-cov~=4.1",
     "ruff~=0.15",
     "mypy~=1.19",
-    "pillow~=10.4",
+    "pillow~=12.1",
 ]
 
 [tool.mypy]
