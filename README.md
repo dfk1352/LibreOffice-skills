@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml)
 
-Python skill suite for [LibreOffice](https://www.libreoffice.org/) Writer, Calc, and Impress via the UNO API.
+Python agent skill suite for LibreOffice Writer, Calc, and Impress via the UNO API.
 Designed for AI agents to create and edit documents, spreadsheets, and presentations through deterministic, file-system-safe operations.
 
 ## Prerequisites
 
 - **Python 3.12+**
-- **LibreOffice** (system-installed, headless mode)
+- **[LibreOffice](https://www.libreoffice.org/)** (system-installed, headless mode)
 - **[uv](https://docs.astral.sh/uv/)** (recommended) or pip
 
 ### Installing LibreOffice
