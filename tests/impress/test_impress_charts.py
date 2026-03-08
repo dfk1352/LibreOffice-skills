@@ -1,6 +1,17 @@
 """Tests for Impress chart operations."""
 
+# pyright: reportMissingImports=false
+
 import pytest
+
+
+def test_add_chart_missing_doc_raises(tmp_path):
+    from impress.charts import add_chart
+    from impress.exceptions import DocumentNotFoundError
+
+    data = [["Category", "Value"], ["A", 10]]
+    with pytest.raises(DocumentNotFoundError):
+        add_chart(str(tmp_path / "no_such.odp"), 0, "bar", data, 1.0, 1.0, 5.0, 3.0)
 
 
 def test_add_chart_returns_index(tmp_path):

@@ -73,20 +73,18 @@ def snapshot_page(
     output.parent.mkdir(parents=True, exist_ok=True)
 
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
         try:
-            # Get page count from DrawPages
             page_count = doc.DrawPages.Count
             if page > page_count:
                 raise InvalidPageError(
                     f"Page {page} out of range (document has {page_count} pages)"
                 )
 
-            # Build FilterData properties
             filter_data = []
 
             fd_width = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
@@ -104,7 +102,6 @@ def snapshot_page(
             fd_page.Value = str(page)
             filter_data.append(fd_page)
 
-            # Build export properties
             props = []
 
             p_filter = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
@@ -127,7 +124,6 @@ def snapshot_page(
         finally:
             doc.close(True)
 
-    # Read PNG dimensions from IHDR chunk
     width, height = _read_png_dimensions(output)
 
     return SnapshotResult(

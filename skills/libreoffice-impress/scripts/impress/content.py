@@ -3,7 +3,9 @@
 from pathlib import Path
 
 from colors import resolve_color
+from impress._util import _cm_to_hmm
 from impress.exceptions import (
+    DocumentNotFoundError,
     InvalidShapeError,
     MediaNotFoundError,
 )
@@ -19,11 +21,6 @@ SHAPE_TYPE_MAP = {
 }
 
 
-def _cm_to_hmm(cm: float) -> int:
-    """Convert centimetres to 1/100 mm."""
-    return int(cm * 1000)
-
-
 def set_title(path: str, slide_index: int, text: str) -> None:
     """Set the title placeholder text on a slide.
 
@@ -33,6 +30,8 @@ def set_title(path: str, slide_index: int, text: str) -> None:
         text: Title text to set.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -59,6 +58,8 @@ def set_body(path: str, slide_index: int, text: str) -> None:
         text: Body text to set.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -84,12 +85,8 @@ def set_body(path: str, slide_index: int, text: str) -> None:
                     ):
                         continue
                     if shape.supportsService("com.sun.star.drawing.Text"):
-                        # If it's a text shape that isn't the title, use it
-                        if not shape.supportsService(
-                            "com.sun.star.presentation.TitleTextShape"
-                        ):
-                            shape.setString(text)
-                            break
+                        shape.setString(text)
+                        break
             doc.store()
         finally:
             doc.close(True)
@@ -119,9 +116,11 @@ def add_text_box(
         Shape index of the new text box.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -143,7 +142,6 @@ def add_text_box(
             slide.add(shape)
             shape.setString(text)
 
-            # Find the index of the shape we just added
             shape_index = slide.Count - 1
             doc.store()
             return shape_index
@@ -177,14 +175,16 @@ def add_image(
     Raises:
         MediaNotFoundError: If image file does not exist.
     """
+    file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
+
     img_file = Path(image_path)
     if not img_file.exists():
         raise MediaNotFoundError(f"Image not found: {image_path}")
 
-    file_path = Path(path)
-
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -250,9 +250,11 @@ def add_shape(
         )
 
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -275,7 +277,6 @@ def add_shape(
 
             slide.add(shape)
 
-            # For CustomShape types, set the geometry
             if shape_type == "triangle":
                 _set_custom_shape_geometry(shape, "isosceles-triangle")
             elif shape_type == "arrow":
@@ -303,7 +304,7 @@ def _set_custom_shape_geometry(shape: object, preset_type: str) -> None:
         shape: UNO CustomShape object.
         preset_type: The EnhancedCustomShapeType preset name.
     """
-    import uno
+    import uno  # type: ignore[import-not-found]
 
     geom = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
     geom.Name = "Type"

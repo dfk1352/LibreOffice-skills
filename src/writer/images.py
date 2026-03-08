@@ -45,23 +45,19 @@ def insert_image(
         doc = desktop.loadComponentFromURL(file_url, "_blank", 0, ())
 
         try:
-            # Create graphic object
             graphic = doc.createInstance("com.sun.star.text.GraphicObject")
 
-            # Set image URL
             img_url = img_file.resolve().as_uri()
             graphic.GraphicURL = img_url
 
-            # Set size if provided
             if width is not None and height is not None:
-                import uno
+                import uno  # type: ignore[import-not-found]
 
                 size = uno.createUnoStruct("com.sun.star.awt.Size")
                 size.Width = width
                 size.Height = height
                 graphic.setSize(size)
 
-            # Get text object and cursor
             text_obj = doc.Text
             cursor = text_obj.createTextCursor()
 
@@ -72,10 +68,8 @@ def insert_image(
                 if position > 0:
                     cursor.goRight(int(position), False)
 
-            # Insert image
             text_obj.insertTextContent(cursor, graphic, False)
 
-            # Save document
             doc.store()
         finally:
             doc.close(True)

@@ -109,7 +109,6 @@ def snapshot_slide(
         else:
             output.write_bytes(png_path.read_bytes())
 
-    # Read actual PNG dimensions from IHDR chunk
     actual_width, actual_height = _read_png_dimensions(output)
 
     return SnapshotResult(

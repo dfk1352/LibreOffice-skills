@@ -1,8 +1,10 @@
 """Chart operations for Impress."""
 
+import warnings
 from pathlib import Path
 
-from impress.exceptions import ImpressSkillError
+from impress._util import _cm_to_hmm
+from impress.exceptions import DocumentNotFoundError, ImpressSkillError
 from uno_bridge import uno_context
 
 
@@ -15,11 +17,6 @@ CHART_TYPE_MAP = {
 
 # CLSID for LibreOffice chart object
 CHART_CLSID = "12DCAE26-281F-416F-a234-c3086127382e"
-
-
-def _cm_to_hmm(cm: float) -> int:
-    """Convert centimetres to 1/100 mm."""
-    return int(cm * 1000)
 
 
 def add_chart(
@@ -59,9 +56,11 @@ def add_chart(
         )
 
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -69,7 +68,6 @@ def add_chart(
         try:
             slide = doc.DrawPages.getByIndex(slide_index)
 
-            # Create OLE2 shape for chart
             shape = doc.createInstance("com.sun.star.drawing.OLE2Shape")
 
             pos = uno.createUnoStruct("com.sun.star.awt.Point")
@@ -96,21 +94,24 @@ def add_chart(
                 diagram = chart_doc.createInstance(CHART_TYPE_MAP[chart_type])
                 chart_doc.setDiagram(diagram)
 
-                # Populate data
                 if data and len(data) > 1:
                     try:
                         _populate_chart_data(chart_doc, data, chart_type)
-                    except Exception:
-                        # Chart data population is best-effort
-                        pass
+                    except Exception as exc:
+                        warnings.warn(
+                            f"chart data population failed: {exc}",
+                            stacklevel=2,
+                        )
 
-                # Set title
                 if title:
                     try:
                         chart_doc.HasMainTitle = True
                         chart_doc.Title.String = title
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        warnings.warn(
+                            f"chart title assignment failed: {exc}",
+                            stacklevel=2,
+                        )
 
             shape_index = slide.Count - 1
             doc.store()
@@ -132,7 +133,6 @@ def _populate_chart_data(
         chart_type: Chart type key.
     """
     try:
-        # Access the data via the chart's internal data
         chart_data = chart_doc.getData()  # type: ignore[attr-defined]
         if chart_data is None:
             return
@@ -140,15 +140,12 @@ def _populate_chart_data(
         headers = data[0]
         rows = data[1:]
 
-        # Set column descriptions (categories)
         categories = [str(row[0]) for row in rows]
         chart_data.setColumnDescriptions(tuple(categories))
 
-        # Set row descriptions (data series names)
         if len(headers) > 1:
             chart_data.setRowDescriptions(tuple(str(h) for h in headers[1:]))
 
-        # Set data values
         num_series = len(headers) - 1
         values = []
         for series_idx in range(num_series):
@@ -162,6 +159,5 @@ def _populate_chart_data(
 
         if values:
             chart_data.setData(tuple(values))
-    except Exception:
-        # Chart data population is best-effort
-        pass
+    except Exception as exc:
+        warnings.warn(f"chart data population failed: {exc}", stacklevel=2)

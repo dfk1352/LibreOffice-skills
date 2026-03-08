@@ -3,12 +3,9 @@
 from pathlib import Path
 
 from colors import resolve_color
+from impress._util import _cm_to_hmm
+from impress.exceptions import DocumentNotFoundError
 from uno_bridge import uno_context
-
-
-def _cm_to_hmm(cm: float) -> int:
-    """Convert centimetres to 1/100 mm."""
-    return int(cm * 1000)
 
 
 def add_table(
@@ -39,9 +36,11 @@ def add_table(
         Shape index of the new table.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -70,7 +69,6 @@ def add_table(
             if cols > 1:
                 model.Columns.insertByIndex(1, cols - 1)
 
-            # Populate data if provided
             if data is not None:
                 for r_idx, row_data in enumerate(data):
                     for c_idx, cell_value in enumerate(row_data):
@@ -104,6 +102,8 @@ def set_table_cell(
         text: Text to set.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -143,6 +143,8 @@ def format_table_cell(
         fill_color: Background colour as 0xRRGGBB integer or name.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(

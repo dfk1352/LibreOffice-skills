@@ -74,6 +74,9 @@ def export_presentation(path: str, output_path: str, format: str) -> None:
         raise ImpressSkillError(f"Unsupported export format: {format}")
 
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
+
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +85,7 @@ def export_presentation(path: str, output_path: str, format: str) -> None:
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
         try:
-            import uno
+            import uno  # type: ignore[import-not-found]
 
             filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
             filter_prop.Name = "FilterName"

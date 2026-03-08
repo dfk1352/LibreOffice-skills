@@ -1,5 +1,33 @@
 """Tests for Impress table operations."""
 
+# pyright: reportMissingImports=false
+
+import pytest
+
+
+def test_add_table_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.tables import add_table
+
+    with pytest.raises(DocumentNotFoundError):
+        add_table(str(tmp_path / "no_such.odp"), 0, 2, 2, 1.0, 1.0, 5.0, 3.0)
+
+
+def test_set_table_cell_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.tables import set_table_cell
+
+    with pytest.raises(DocumentNotFoundError):
+        set_table_cell(str(tmp_path / "no_such.odp"), 0, 0, 0, 0, "Value")
+
+
+def test_format_table_cell_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.tables import format_table_cell
+
+    with pytest.raises(DocumentNotFoundError):
+        format_table_cell(str(tmp_path / "no_such.odp"), 0, 0, 0, 0)
+
 
 def test_add_table_returns_index(tmp_path):
     from impress.core import create_presentation

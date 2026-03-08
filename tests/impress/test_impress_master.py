@@ -1,6 +1,56 @@
 """Tests for Impress master page operations."""
 
+# pyright: reportMissingImports=false
+
 import pytest
+
+
+def test_list_master_pages_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.master import list_master_pages
+
+    with pytest.raises(DocumentNotFoundError):
+        list_master_pages(str(tmp_path / "no_such.odp"))
+
+
+def test_apply_master_page_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.master import apply_master_page
+
+    with pytest.raises(DocumentNotFoundError):
+        apply_master_page(str(tmp_path / "no_such.odp"), "Default")
+
+
+def test_import_master_missing_target_raises(tmp_path):
+    from impress.core import create_presentation
+    from impress.exceptions import DocumentNotFoundError
+    from impress.master import import_master_from_template
+
+    template_path = tmp_path / "template.odp"
+    create_presentation(str(template_path))
+
+    with pytest.raises(DocumentNotFoundError):
+        import_master_from_template(str(tmp_path / "no_such.odp"), str(template_path))
+
+
+def test_import_master_missing_template_raises(tmp_path):
+    from impress.core import create_presentation
+    from impress.exceptions import DocumentNotFoundError
+    from impress.master import import_master_from_template
+
+    target_path = tmp_path / "target.odp"
+    create_presentation(str(target_path))
+
+    with pytest.raises(DocumentNotFoundError):
+        import_master_from_template(str(target_path), str(tmp_path / "no_such.odp"))
+
+
+def test_set_master_background_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.master import set_master_background
+
+    with pytest.raises(DocumentNotFoundError):
+        set_master_background(str(tmp_path / "no_such.odp"), "Default", "red")
 
 
 def test_list_master_pages(tmp_path):

@@ -1,5 +1,7 @@
 """Tests for Impress media operations."""
 
+# pyright: reportMissingImports=false
+
 import struct
 import wave
 
@@ -13,6 +15,30 @@ def _create_minimal_wav(path):
         w.setsampwidth(2)
         w.setframerate(44100)
         w.writeframes(struct.pack("<h", 0) * 100)
+
+
+def test_add_audio_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.media import add_audio
+
+    wav_path = tmp_path / "test.wav"
+    _create_minimal_wav(wav_path)
+
+    with pytest.raises(DocumentNotFoundError):
+        add_audio(str(tmp_path / "no_such.odp"), 0, str(wav_path), 1.0, 1.0, 3.0, 3.0)
+
+
+def test_add_video_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.media import add_video
+
+    video_path = tmp_path / "test.mp4"
+    video_path.write_bytes(b"\x00" * 100)
+
+    with pytest.raises(DocumentNotFoundError):
+        add_video(
+            str(tmp_path / "no_such.odp"), 0, str(video_path), 2.0, 2.0, 10.0, 7.0
+        )
 
 
 def test_add_audio_returns_index(tmp_path):

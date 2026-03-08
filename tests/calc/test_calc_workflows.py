@@ -1,5 +1,7 @@
 """Integration tests for Calc workflows."""
 
+# pyright: reportMissingImports=false
+
 from pathlib import Path
 
 
@@ -158,7 +160,7 @@ def test_calc_snapshot_in_workflow(tmp_path):
 
 
 def test_calc_workflow_outputs_to_test_output_dir():
-    """Produce inspectable output files in test-output/.
+    """Produce inspectable output files in test-output/calc/.
 
     Calls run_calc_end_to_end_workflow which builds a Calc spreadsheet
     with data, formulas, chart, and validation, snapshots it before and
@@ -166,23 +168,18 @@ def test_calc_workflow_outputs_to_test_output_dir():
     exist and the snapshots differ.
 
     Output files:
-        test-output/workflow.ods              - the spreadsheet
-        test-output/workflow.pdf              - PDF export
-        test-output/calc_snapshot_before.png  - before formatting changes
-        test-output/calc_snapshot_after.png   - after formatting changes
+        test-output/calc/workflow.ods              - the spreadsheet
+        test-output/calc/workflow.pdf              - PDF export
+        test-output/calc/calc_snapshot_before.png  - before formatting changes
+        test-output/calc/calc_snapshot_after.png   - after formatting changes
     """
-    output_dir = Path("test-output")
+    output_dir = Path("test-output/calc")
 
     # Clean up previous runs
-    for name in [
-        "workflow.ods",
-        "workflow.pdf",
-        "calc_snapshot_before.png",
-        "calc_snapshot_after.png",
-    ]:
-        p = output_dir / name
-        if p.exists():
-            p.unlink()
+    if output_dir.exists():
+        import shutil
+
+        shutil.rmtree(output_dir)
 
     outputs = run_calc_end_to_end_workflow(output_dir)
 

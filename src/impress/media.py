@@ -1,14 +1,11 @@
 """Media operations for Impress."""
 
+import warnings
 from pathlib import Path
 
-from impress.exceptions import MediaNotFoundError
+from impress._util import _cm_to_hmm
+from impress.exceptions import DocumentNotFoundError, MediaNotFoundError
 from uno_bridge import uno_context
-
-
-def _cm_to_hmm(cm: float) -> int:
-    """Convert centimetres to 1/100 mm."""
-    return int(cm * 1000)
 
 
 def add_audio(
@@ -37,6 +34,10 @@ def add_audio(
     Raises:
         MediaNotFoundError: If audio file does not exist.
     """
+    file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
+
     media_file = Path(media_path)
     if not media_file.exists():
         raise MediaNotFoundError(f"Audio file not found: {media_path}")
@@ -72,6 +73,10 @@ def add_video(
     Raises:
         MediaNotFoundError: If video file does not exist.
     """
+    file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
+
     media_file = Path(media_path)
     if not media_file.exists():
         raise MediaNotFoundError(f"Video file not found: {media_path}")
@@ -108,7 +113,7 @@ def _add_media_shape(
     media_file = Path(media_path)
 
     with uno_context() as desktop:
-        import uno
+        import uno  # type: ignore[import-not-found]
 
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -119,7 +124,11 @@ def _add_media_shape(
             # Try MediaShape first, fall back to PluginShape
             try:
                 shape = doc.createInstance("com.sun.star.presentation.MediaShape")
-            except Exception:
+            except Exception as exc:
+                warnings.warn(
+                    f"media shape creation fallback triggered: {exc}",
+                    stacklevel=2,
+                )
                 shape = doc.createInstance("com.sun.star.drawing.PluginShape")
 
             pos = uno.createUnoStruct("com.sun.star.awt.Point")
@@ -138,11 +147,18 @@ def _add_media_shape(
             media_url = media_file.resolve().as_uri()
             try:
                 shape.MediaURL = media_url
-            except Exception:
+            except Exception as exc:
+                warnings.warn(
+                    f"MediaURL assignment failed, trying PluginURL: {exc}",
+                    stacklevel=2,
+                )
                 try:
                     shape.PluginURL = media_url
-                except Exception:
-                    pass
+                except Exception as plugin_exc:
+                    warnings.warn(
+                        f"PluginURL assignment failed: {plugin_exc}",
+                        stacklevel=2,
+                    )
 
             shape_index = slide.Count - 1
             doc.store()

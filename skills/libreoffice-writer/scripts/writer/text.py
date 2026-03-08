@@ -27,7 +27,6 @@ def insert_text(path: str, text: str, position: int | None = None) -> None:
         doc = desktop.loadComponentFromURL(file_url, "_blank", 0, ())
 
         try:
-            # Get text object and cursor
             text_obj = doc.Text
             cursor = text_obj.createTextCursor()
 
@@ -38,7 +37,6 @@ def insert_text(path: str, text: str, position: int | None = None) -> None:
                 if position > 0:
                     cursor.goRight(int(position), False)
 
-            # Insert text
             if "\n" in text:
                 for idx, part in enumerate(text.split("\n")):
                     if idx > 0:
@@ -48,7 +46,6 @@ def insert_text(path: str, text: str, position: int | None = None) -> None:
             else:
                 text_obj.insertString(cursor, text, False)
 
-            # Save document
             doc.store()
         finally:
             doc.close(True)
@@ -74,17 +71,14 @@ def replace_text(path: str, old: str, new: str) -> None:
         doc = desktop.loadComponentFromURL(file_url, "_blank", 0, ())
 
         try:
-            # Create search descriptor
             search = doc.createSearchDescriptor()
             search.SearchString = old
 
-            # Find and replace all
             found = doc.findFirst(search)
             while found:
                 found.setString(new)
                 found = doc.findNext(found.End, search)
 
-            # Save document
             doc.store()
         finally:
             doc.close(True)

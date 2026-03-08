@@ -125,8 +125,15 @@ result = snapshot_slide(str(doc_path), 0, "/tmp/slide1.png")
 **Cleanup:** Remove snapshot PNGs after verification. Do not let temporary
 images accumulate.
 
+```python
+Path(result.file_path).unlink(missing_ok=True)
+```
+
 ## Common Mistakes
 - Passing relative paths (UNO loads absolute URLs).
 - Using 1-based slide indices.
 - Forgetting to create the document before inserting content.
-- Passing uppercase layout or shape type names.
+- Passing lowercase layout names - layouts use UPPER_SNAKE_CASE
+  (e.g., `BLANK`, `TITLE_SLIDE`).
+- Passing uppercase shape types - shape types use lowercase
+  (e.g., `rectangle`, `ellipse`).

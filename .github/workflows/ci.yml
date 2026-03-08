@@ -12,6 +12,7 @@ on:
 
 jobs:
   lint:
+    if: github.repository == 'dfk1352/LibreOffice-skills'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +40,7 @@ jobs:
         run: uv run mypy src/
 
   test:
+    if: github.repository == 'dfk1352/LibreOffice-skills'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

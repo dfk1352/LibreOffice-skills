@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from impress.exceptions import (
+    DocumentNotFoundError,
     InvalidLayoutError,
     InvalidSlideIndexError,
 )
@@ -41,6 +42,8 @@ def add_slide(
         )
 
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -68,6 +71,8 @@ def delete_slide(path: str, index: int) -> None:
         InvalidSlideIndexError: If index is out of range.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -98,10 +103,12 @@ def move_slide(path: str, from_index: int, to_index: int) -> None:
         from_index: Current zero-based slide index.
         to_index: Target zero-based slide index.
     """
+    file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
+
     if from_index == to_index:
         return
-
-    file_path = Path(path)
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -164,7 +171,6 @@ def _copy_slide_to_position(
 
     source = pages.getByIndex(actual_src)  # type: ignore[attr-defined]
 
-    # Copy non-placeholder shapes from source to target
     for i in range(source.Count):
         src_shape = source.getByIndex(i)
 
@@ -178,7 +184,6 @@ def _copy_slide_to_position(
         new_shape.Size = src_shape.Size
         target.add(new_shape)
 
-        # Copy text content
         if src_shape.supportsService("com.sun.star.drawing.Text"):
             new_shape.setString(src_shape.getString())
 
@@ -193,6 +198,8 @@ def duplicate_slide(path: str, index: int) -> None:
         index: Zero-based slide index to duplicate.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -219,6 +226,8 @@ def get_slide_inventory(path: str, index: int) -> dict:
         Each shape has index, type, text, x_cm, y_cm, width_cm, height_cm.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(

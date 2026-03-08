@@ -1,6 +1,48 @@
 """Tests for Impress slide management operations."""
 
+# pyright: reportMissingImports=false
+
 import pytest
+
+
+def test_add_slide_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.slides import add_slide
+
+    with pytest.raises(DocumentNotFoundError):
+        add_slide(str(tmp_path / "no_such.odp"))
+
+
+def test_delete_slide_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.slides import delete_slide
+
+    with pytest.raises(DocumentNotFoundError):
+        delete_slide(str(tmp_path / "no_such.odp"), 0)
+
+
+def test_move_slide_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.slides import move_slide
+
+    with pytest.raises(DocumentNotFoundError):
+        move_slide(str(tmp_path / "no_such.odp"), 0, 1)
+
+
+def test_duplicate_slide_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.slides import duplicate_slide
+
+    with pytest.raises(DocumentNotFoundError):
+        duplicate_slide(str(tmp_path / "no_such.odp"), 0)
+
+
+def test_get_slide_inventory_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.slides import get_slide_inventory
+
+    with pytest.raises(DocumentNotFoundError):
+        get_slide_inventory(str(tmp_path / "no_such.odp"), 0)
 
 
 def test_add_slide_appends_by_default(tmp_path):

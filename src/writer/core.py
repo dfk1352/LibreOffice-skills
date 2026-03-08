@@ -25,14 +25,10 @@ def create_document(path: str) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
 
     with uno_context() as desktop:
-        # Create new Writer document
         doc = desktop.loadComponentFromURL("private:factory/swriter", "_blank", 0, ())
 
         try:
-            # Convert path to file URL
             file_url = Path(path).resolve().as_uri()
-
-            # Save document
             doc.storeAsURL(file_url, ())
         finally:
             doc.close(True)
@@ -60,7 +56,6 @@ def read_document_text(path: str) -> str:
         doc = desktop.loadComponentFromURL(file_url, "_blank", 0, ())
 
         try:
-            # Get text from document
             text = doc.Text.getString()
             return text
         finally:
@@ -92,7 +87,7 @@ def export_document(path: str, output_path: str, format: str) -> None:
             (),
         )
         try:
-            import uno
+            import uno  # type: ignore[import-not-found]
 
             filter_name = EXPORT_FILTERS[format]
             filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")

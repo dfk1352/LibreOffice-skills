@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from colors import resolve_color
+from impress.exceptions import DocumentNotFoundError
 from uno_bridge import uno_context
 
 
@@ -42,6 +43,8 @@ def format_shape_text(
             Case-insensitive; unknown values raise ValueError.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -92,6 +95,8 @@ def set_slide_background(
         color: Background colour as 0xRRGGBB integer or name.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(

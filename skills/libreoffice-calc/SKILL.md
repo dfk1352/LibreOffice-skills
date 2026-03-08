@@ -35,8 +35,9 @@ instead of raw UNO calls or a CLI.
 - R1C1 addressing (row, col) is primary and zero-based.
 - Use explicit `type` in examples ("number", "text", "date", "formula").
 - `create_chart`: `anchor=(row, col)` is the zero-based cell that pins
-  the chart's top-left corner. `size=(width_px, height_px)` sets pixel
-  dimensions. UNO 1/100mm conversion is handled internally.
+  the chart's top-left corner. `size=(width, height)` sets chart dimensions
+  in 1/100 mm (UNO native units). Example: `size=(10000, 7000)` produces a
+  10 cm x 7 cm chart.
 - Color fields accept either a `0xRRGGBB` integer or a CSS color name string.
 
 ## Example: Create a Summary Sheet
@@ -63,7 +64,7 @@ create_chart(
     (0, 0, 2, 0),
     "line",
     anchor=(5, 0),      # chart top-left at row 5, col 0
-    size=(5000, 3000),  # 5000 x 3000 pixels
+    size=(5000, 3000),  # 5 cm x 3 cm (1/100 mm units)
     title="Revenue Trend",
 )
 ```
@@ -104,6 +105,10 @@ result = snapshot_area(
 
 **Cleanup:** Remove snapshot PNGs after verification. Do not let temporary
 images accumulate.
+
+```python
+Path(result.file_path).unlink(missing_ok=True)
+```
 
 **Visual Red Flags:**
 - Charts overlapping data cells.

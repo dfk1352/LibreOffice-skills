@@ -1,5 +1,7 @@
 """Integration workflow tests for Writer skill."""
 
+# pyright: reportMissingImports=false
+
 from pathlib import Path
 
 from PIL import Image
@@ -208,29 +210,24 @@ def test_writer_snapshot_in_workflow(tmp_path):
 
 
 def test_workflow_outputs_to_test_output_dir():
-    """Produce inspectable output files in test-output/.
+    """Produce inspectable output files in test-output/writer/.
 
     Calls run_end_to_end_workflow which builds a Writer document,
     snapshots it before and after formatting changes. Assertions
     verify that all output files exist and the snapshots differ.
 
     Output files:
-        test-output/report.odt                 - the document
-        test-output/writer_snapshot_before.png  - before formatting changes
-        test-output/writer_snapshot_after.png   - after formatting changes
+        test-output/writer/report.odt                 - the document
+        test-output/writer/writer_snapshot_before.png  - before formatting changes
+        test-output/writer/writer_snapshot_after.png   - after formatting changes
     """
-    output_dir = Path("test-output")
+    output_dir = Path("test-output/writer")
 
     # Clean up previous runs
-    for name in [
-        "report.odt",
-        "test_image.png",
-        "writer_snapshot_before.png",
-        "writer_snapshot_after.png",
-    ]:
-        p = output_dir / name
-        if p.exists():
-            p.unlink()
+    if output_dir.exists():
+        import shutil
+
+        shutil.rmtree(output_dir)
 
     outputs = run_end_to_end_workflow(output_dir)
 

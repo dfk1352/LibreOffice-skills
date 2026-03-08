@@ -59,7 +59,6 @@ def apply_formatting(
             text_obj = doc.Text
             cursor = text_obj.createTextCursor()
 
-            # Select text based on selection parameter
             if selection == "all":
                 cursor.gotoStart(False)
                 cursor.gotoEnd(True)
@@ -70,7 +69,6 @@ def apply_formatting(
                 cursor.gotoStart(False)
                 cursor.gotoEnd(True)
 
-            # Apply character formatting
             if "bold" in formatting:
                 # Use numeric constants instead of enums
                 # BOLD = 150, NORMAL = 100
@@ -93,7 +91,6 @@ def apply_formatting(
             if "color" in formatting:
                 cursor.CharColor = resolve_color(formatting["color"])
 
-            # Apply paragraph formatting
             if "align" in formatting:
                 # Use numeric constants for paragraph alignment
                 # LEFT = 0, RIGHT = 1, BLOCK = 3, CENTER = 2
@@ -112,8 +109,7 @@ def apply_formatting(
                     )
 
             if "line_spacing" in formatting:
-                # Create line spacing structure
-                import uno
+                import uno  # type: ignore[import-not-found]
 
                 line_spacing = uno.createUnoStruct("com.sun.star.style.LineSpacing")
                 line_spacing.Mode = 0  # PROP mode
@@ -126,7 +122,6 @@ def apply_formatting(
             if "spacing_after" in formatting:
                 cursor.ParaBottomMargin = formatting["spacing_after"]
 
-            # Save document
             doc.store()
         finally:
             doc.close(True)

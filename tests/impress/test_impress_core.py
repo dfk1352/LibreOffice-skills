@@ -1,8 +1,22 @@
 """Tests for Impress core presentation operations."""
 
+# pyright: reportMissingImports=false
+
 import zipfile
 
 import pytest
+
+
+def test_export_presentation_missing_doc_raises(tmp_path):
+    from impress.core import export_presentation
+    from impress.exceptions import DocumentNotFoundError
+
+    with pytest.raises(DocumentNotFoundError):
+        export_presentation(
+            str(tmp_path / "no_such.odp"),
+            str(tmp_path / "out.pdf"),
+            "pdf",
+        )
 
 
 def test_create_presentation_creates_file(tmp_path):

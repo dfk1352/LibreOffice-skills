@@ -53,11 +53,9 @@ def add_table(
         doc = desktop.loadComponentFromURL(file_url, "_blank", 0, ())
 
         try:
-            # Create table
             table = doc.createInstance("com.sun.star.text.TextTable")
             table.initialize(rows, cols)
 
-            # Get text object and cursor
             text_obj = doc.Text
             cursor = text_obj.createTextCursor()
 
@@ -68,10 +66,8 @@ def add_table(
                 if position > 0:
                     cursor.goRight(int(position), False)
 
-            # Insert table at cursor position
             text_obj.insertTextContent(cursor, table, False)
 
-            # Populate table with data if provided
             if data is not None:
                 for row_idx, row_data in enumerate(data):
                     for col_idx, cell_value in enumerate(row_data):
@@ -79,7 +75,6 @@ def add_table(
                         cell = table.getCellByName(cell_name)
                         cell.setString(str(cell_value))
 
-            # Save document
             doc.store()
         finally:
             doc.close(True)
@@ -95,7 +90,6 @@ def get_cell_name(row: int, col: int) -> str:
     Returns:
         Cell name like 'A1', 'B2', etc.
     """
-    # Convert column index to letter(s)
     col_name = ""
     col_num = col + 1
     while col_num > 0:

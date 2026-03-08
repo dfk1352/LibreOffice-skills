@@ -35,7 +35,6 @@ def set_metadata(path: str, values: dict[str, str]) -> None:
         try:
             doc_info = doc.getDocumentProperties()
 
-            # Map common metadata fields
             if "title" in values:
                 doc_info.Title = values["title"]
 
@@ -46,7 +45,6 @@ def set_metadata(path: str, values: dict[str, str]) -> None:
                 doc_info.Subject = values["subject"]
 
             if "keywords" in values:
-                # Keywords can be a comma-separated string
                 keywords = values["keywords"]
                 if isinstance(keywords, str):
                     keyword_list = [k.strip() for k in keywords.split(",")]
@@ -57,7 +55,6 @@ def set_metadata(path: str, values: dict[str, str]) -> None:
             if "description" in values:
                 doc_info.Description = values["description"]
 
-            # Save document
             doc.store()
         finally:
             doc.close(True)

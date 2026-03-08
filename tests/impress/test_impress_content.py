@@ -1,6 +1,56 @@
 """Tests for Impress content placement operations."""
 
+# pyright: reportMissingImports=false
+
 import pytest
+
+
+def test_set_title_missing_doc_raises(tmp_path):
+    import impress.content as content
+    from impress.exceptions import DocumentNotFoundError
+
+    missing = str(tmp_path / "no_such.odp")
+    with pytest.raises(DocumentNotFoundError):
+        content.set_title(missing, 0, "Title")
+
+
+def test_set_body_missing_doc_raises(tmp_path):
+    import impress.content as content
+    from impress.exceptions import DocumentNotFoundError
+
+    missing = str(tmp_path / "no_such.odp")
+    with pytest.raises(DocumentNotFoundError):
+        content.set_body(missing, 0, "Body")
+
+
+def test_add_text_box_missing_doc_raises(tmp_path):
+    import impress.content as content
+    from impress.exceptions import DocumentNotFoundError
+
+    missing = str(tmp_path / "no_such.odp")
+    with pytest.raises(DocumentNotFoundError):
+        content.add_text_box(missing, 0, "Hello", 1.0, 1.0, 5.0, 2.0)
+
+
+def test_add_image_missing_doc_raises(tmp_path):
+    import impress.content as content
+    from impress.exceptions import DocumentNotFoundError
+
+    image_path = tmp_path / "image.png"
+    image_path.write_bytes(b"png")
+
+    missing = str(tmp_path / "no_such.odp")
+    with pytest.raises(DocumentNotFoundError):
+        content.add_image(missing, 0, str(image_path), 1.0, 1.0, 5.0, 5.0)
+
+
+def test_add_shape_missing_doc_raises(tmp_path):
+    import impress.content as content
+    from impress.exceptions import DocumentNotFoundError
+
+    missing = str(tmp_path / "no_such.odp")
+    with pytest.raises(DocumentNotFoundError):
+        content.add_shape(missing, 0, "rectangle", 1.0, 1.0, 5.0, 3.0)
 
 
 def test_set_title_on_title_slide(tmp_path):
@@ -102,11 +152,12 @@ def test_add_image_returns_shape_index(tmp_path):
 def test_add_image_missing_file_raises(tmp_path):
     from impress.content import add_image
     from impress.core import create_presentation
+    from impress.exceptions import MediaNotFoundError
 
     path = tmp_path / "image_missing.odp"
     create_presentation(str(path))
 
-    with pytest.raises(Exception):
+    with pytest.raises(MediaNotFoundError):
         add_image(str(path), 0, str(tmp_path / "missing.png"), 1.0, 1.0, 5.0, 5.0)
 
 

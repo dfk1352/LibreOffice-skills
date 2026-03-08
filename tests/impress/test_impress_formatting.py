@@ -1,5 +1,25 @@
 """Tests for Impress formatting operations."""
 
+# pyright: reportMissingImports=false
+
+import pytest
+
+
+def test_format_shape_text_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.formatting import format_shape_text
+
+    with pytest.raises(DocumentNotFoundError):
+        format_shape_text(str(tmp_path / "no_such.odp"), 0, 0)
+
+
+def test_set_slide_background_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.formatting import set_slide_background
+
+    with pytest.raises(DocumentNotFoundError):
+        set_slide_background(str(tmp_path / "no_such.odp"), 0, "red")
+
 
 def test_format_shape_text_bold(tmp_path):
     from impress.content import add_text_box
@@ -92,8 +112,6 @@ def test_format_shape_text_alignment(tmp_path):
 
 
 def test_format_shape_text_alignment_invalid_raises(tmp_path):
-    import pytest
-
     from impress.content import add_text_box
     from impress.core import create_presentation
     from impress.formatting import format_shape_text

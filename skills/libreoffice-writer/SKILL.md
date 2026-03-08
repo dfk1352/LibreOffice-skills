@@ -118,6 +118,10 @@ result = snapshot_page(str(doc_path), "/tmp/page1.png", page=1, dpi=150)
 **Cleanup:** Remove snapshot PNGs after verification. Do not let temporary
 images accumulate.
 
+```python
+Path(result.file_path).unlink(missing_ok=True)
+```
+
 **Visual Red Flags:**
 - Overlapping elements (text over images, tables over images).
 - Cut-off text or tables at page boundaries.

@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from colors import resolve_color
-from impress.exceptions import MasterNotFoundError
+from impress.exceptions import DocumentNotFoundError, MasterNotFoundError
 from uno_bridge import uno_context
 
 
@@ -17,6 +17,8 @@ def list_master_pages(path: str) -> list[str]:
         List of master page name strings.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -42,13 +44,14 @@ def apply_master_page(path: str, master_name: str) -> None:
         MasterNotFoundError: If master_name is not found.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
         try:
-            # Find the master page by name
             masters = doc.MasterPages
             target_master = None
             for i in range(masters.Count):
@@ -84,10 +87,14 @@ def import_master_from_template(path: str, template_path: str) -> str:
         Name of the imported master page.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
+
     tmpl_path = Path(template_path)
+    if not tmpl_path.exists():
+        raise DocumentNotFoundError(f"Template not found: {template_path}")
 
     with uno_context() as desktop:
-        # Open template to get master page info
         tmpl_doc = desktop.loadComponentFromURL(
             tmpl_path.resolve().as_uri(), "_blank", 0, ()
         )
@@ -97,19 +104,16 @@ def import_master_from_template(path: str, template_path: str) -> str:
         finally:
             tmpl_doc.close(True)
 
-        # Open target and add master page
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
         try:
             masters = doc.MasterPages
 
-            # Check if master already exists
             for i in range(masters.Count):
                 if masters.getByIndex(i).Name == imported_name:
                     return imported_name
 
-            # Add a new master page
             new_master = masters.insertNewByIndex(masters.Count)
             new_master.Name = imported_name
 
@@ -135,6 +139,8 @@ def set_master_background(
         MasterNotFoundError: If master_name is not found.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(

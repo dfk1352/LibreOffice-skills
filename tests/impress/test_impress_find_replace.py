@@ -1,5 +1,17 @@
 """Tests for Impress find & replace operations."""
 
+# pyright: reportMissingImports=false
+
+import pytest
+
+
+def test_find_replace_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.find_replace import find_replace
+
+    with pytest.raises(DocumentNotFoundError):
+        find_replace(str(tmp_path / "no_such.odp"), "old", "new")
+
 
 def test_find_replace_in_presentation(tmp_path):
     from impress.content import add_text_box

@@ -1,6 +1,24 @@
 """Tests for Impress speaker notes operations."""
 
+# pyright: reportMissingImports=false
+
 import pytest
+
+
+def test_set_notes_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.notes import set_notes
+
+    with pytest.raises(DocumentNotFoundError):
+        set_notes(str(tmp_path / "no_such.odp"), 0, "Notes")
+
+
+def test_get_notes_missing_doc_raises(tmp_path):
+    from impress.exceptions import DocumentNotFoundError
+    from impress.notes import get_notes
+
+    with pytest.raises(DocumentNotFoundError):
+        get_notes(str(tmp_path / "no_such.odp"), 0)
 
 
 def test_set_and_get_notes(tmp_path):

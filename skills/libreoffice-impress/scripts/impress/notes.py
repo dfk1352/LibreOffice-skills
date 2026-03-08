@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from impress.exceptions import InvalidSlideIndexError
+from impress.exceptions import DocumentNotFoundError, InvalidSlideIndexError
 from uno_bridge import uno_context
 
 
@@ -18,6 +18,8 @@ def set_notes(path: str, slide_index: int, text: str) -> None:
         InvalidSlideIndexError: If slide index is out of range.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
@@ -57,6 +59,8 @@ def get_notes(path: str, slide_index: int) -> str:
         InvalidSlideIndexError: If slide index is out of range.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
