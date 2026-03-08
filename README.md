@@ -1,4 +1,4 @@
-# LibreOffice Skills
+# LibreOffice Agent Skills
 
 [![CI](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml)
 
