@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from calc.exceptions import DocumentNotFoundError
 from uno_bridge import uno_context
 
 
@@ -26,6 +27,8 @@ def define_named_range(
         end_col: Zero-based end column (optional).
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -71,6 +74,8 @@ def get_named_range(path: str, name: str) -> dict[str, object]:
         Named range metadata.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()

@@ -1,9 +1,11 @@
 """UNO bridge for connecting to LibreOffice."""
 
+import importlib.util
 import os
+import shutil
 import subprocess
-import time
 import sys
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Optional
@@ -17,18 +19,10 @@ def find_libreoffice() -> Optional[str]:
     Returns:
         Path to soffice executable, or None if not found.
     """
-    # Common executable names
-    executables = ["soffice", "libreoffice"]
-
-    # Check PATH first
-    for exe in executables:
-        path = subprocess.run(
-            ["which", exe],
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        if path:
-            return path
+    for exe in ("soffice", "libreoffice"):
+        found = shutil.which(exe)
+        if found:
+            return found
 
     # Check common installation locations
     common_paths = [
@@ -44,6 +38,45 @@ def find_libreoffice() -> Optional[str]:
             return path
 
     return None
+
+
+def _resolve_uno_module() -> None:
+    """Ensure the LibreOffice-provided ``uno`` module can be imported.
+
+    Resolution order:
+    1. Already importable from the current Python environment.
+    2. ``LIBREOFFICE_PROGRAM_PATH`` environment variable override.
+    3. Parent directory of the detected ``soffice`` executable.
+
+    Raises:
+        UnoBridgeError: If no valid LibreOffice program directory is found.
+    """
+    if importlib.util.find_spec("uno") is not None:
+        return
+
+    candidates: list[Path] = []
+
+    env_path = os.environ.get("LIBREOFFICE_PROGRAM_PATH")
+    if env_path:
+        candidates.append(Path(env_path))
+
+    soffice_path = find_libreoffice()
+    if soffice_path:
+        candidates.append(Path(soffice_path).resolve().parent)
+
+    for candidate in candidates:
+        if candidate.is_dir():
+            candidate_str = str(candidate)
+            if candidate_str not in sys.path:
+                sys.path.insert(0, candidate_str)
+            if importlib.util.find_spec("uno") is not None:
+                return
+
+    raise UnoBridgeError(
+        "Unable to import the LibreOffice UNO Python module. "
+        "Install LibreOffice with Python UNO support or set "
+        "LIBREOFFICE_PROGRAM_PATH to the LibreOffice program directory."
+    )
 
 
 def validate_lo_path(path: str) -> None:
@@ -73,16 +106,7 @@ def uno_context() -> Generator[Any, None, None]:
         with uno_context() as desktop:
             doc = desktop.loadComponentFromURL(...)
     """
-    import importlib.util
-
-    uno_spec = importlib.util.find_spec("uno")
-    if uno_spec is None:
-        soffice_path = find_libreoffice()
-        if not soffice_path:
-            raise UnoBridgeError("LibreOffice not found. Please install LibreOffice.")
-        lo_program = Path(soffice_path).resolve().parent
-        if lo_program.is_dir():
-            sys.path.insert(0, str(lo_program))
+    _resolve_uno_module()
 
     import uno
     from com.sun.star.connection import NoConnectException

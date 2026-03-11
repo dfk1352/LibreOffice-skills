@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from calc.exceptions import DocumentNotFoundError
 from uno_bridge import uno_context
 
 
@@ -20,6 +21,8 @@ def add_sheet(path: str, name: str, index: int | None = None) -> None:
         index: Optional index to insert the sheet at.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -43,6 +46,8 @@ def list_sheets(path: str) -> list[dict[str, object]]:
         List of dictionaries with sheet metadata.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -72,6 +77,8 @@ def rename_sheet(path: str, old_name: str, new_name: str) -> None:
         new_name: New sheet name.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -92,6 +99,8 @@ def remove_sheet(path: str, name: str) -> None:
         name: Sheet name to remove.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()

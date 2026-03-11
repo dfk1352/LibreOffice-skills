@@ -1,5 +1,7 @@
 """Tests for Calc formula recalculation."""
 
+import pytest
+
 
 def test_formula_recalculation(tmp_path) -> None:
     from calc.cells import get_cell, set_cell
@@ -16,3 +18,11 @@ def test_formula_recalculation(tmp_path) -> None:
     cell = get_cell(str(path), 0, 0, 1)
     assert cell["value"] == 20
     assert cell["error"] is None
+
+
+def test_recalculate_raises_on_missing_file(tmp_path) -> None:
+    from calc.exceptions import DocumentNotFoundError
+    from calc.recalc import recalculate
+
+    with pytest.raises(DocumentNotFoundError):
+        recalculate(str(tmp_path / "missing.ods"))

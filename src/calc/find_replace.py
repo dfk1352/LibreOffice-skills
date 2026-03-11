@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from calc.exceptions import DocumentNotFoundError
 from uno_bridge import uno_context
 
 
@@ -28,6 +29,8 @@ def find_replace(
         Number of replacements made.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
 
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(

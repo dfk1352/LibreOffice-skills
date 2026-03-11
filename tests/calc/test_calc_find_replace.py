@@ -1,5 +1,7 @@
 """Tests for Calc find & replace operations."""
 
+import pytest
+
 
 def test_find_replace_in_calc(tmp_path):
     from calc.cells import get_cell, set_cell
@@ -42,3 +44,11 @@ def test_find_replace_in_calc_scoped_to_sheet(tmp_path):
     # Sheet2 should have the replacement
     cell_sheet2 = get_cell(str(path), "Sheet2", 0, 0)
     assert "Changed" in cell_sheet2["value"]
+
+
+def test_find_replace_raises_on_missing_file(tmp_path):
+    from calc.exceptions import DocumentNotFoundError
+    from calc.find_replace import find_replace
+
+    with pytest.raises(DocumentNotFoundError):
+        find_replace(str(tmp_path / "missing.ods"), "find", "replace")

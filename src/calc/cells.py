@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from calc.exceptions import InvalidCellReferenceError
+from calc.exceptions import DocumentNotFoundError, InvalidCellReferenceError
 from uno_bridge import uno_context
 
 
@@ -61,6 +61,8 @@ def set_cell(
     if row < 0 or col < 0:
         raise InvalidCellReferenceError("Row and column must be non-negative")
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
@@ -109,6 +111,8 @@ def get_cell(
     if row < 0 or col < 0:
         raise InvalidCellReferenceError("Row and column must be non-negative")
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from calc.exceptions import CalcSkillError
+from calc.exceptions import CalcSkillError, DocumentNotFoundError
 from colors import resolve_color
 from uno_bridge import uno_context
 
@@ -46,6 +46,8 @@ def apply_format(
         format: Formatting dictionary.
     """
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()

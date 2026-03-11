@@ -1,5 +1,7 @@
 """Tests for Calc data validation."""
 
+import pytest
+
 
 def test_add_validation_rule(tmp_path) -> None:
     from calc.core import create_spreadsheet
@@ -39,3 +41,19 @@ def test_add_validation_rule(tmp_path) -> None:
             assert validation.ShowErrorMessage
         finally:
             doc.close(True)
+
+
+def test_add_validation_raises_on_missing_file(tmp_path) -> None:
+    from calc.exceptions import DocumentNotFoundError
+    from calc.validation import add_validation
+
+    with pytest.raises(DocumentNotFoundError):
+        add_validation(
+            str(tmp_path / "missing.ods"),
+            "Sheet1",
+            0,
+            0,
+            0,
+            0,
+            {"type": "whole", "condition": "equal", "value1": 1},
+        )

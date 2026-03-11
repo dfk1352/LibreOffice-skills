@@ -1,5 +1,7 @@
 """Tests for Calc chart creation."""
 
+import pytest
+
 
 def test_create_chart(tmp_path) -> None:
     from calc.charts import create_chart
@@ -38,3 +40,18 @@ def test_create_chart(tmp_path) -> None:
             assert embedded.Title.String == "Sample"
         finally:
             doc.close(True)
+
+
+def test_create_chart_raises_on_missing_file(tmp_path) -> None:
+    from calc.charts import create_chart
+    from calc.exceptions import DocumentNotFoundError
+
+    with pytest.raises(DocumentNotFoundError):
+        create_chart(
+            str(tmp_path / "missing.ods"),
+            "Sheet1",
+            (0, 0, 1, 1),
+            "bar",
+            anchor=(0, 0),
+            size=(100, 100),
+        )

@@ -27,6 +27,10 @@ class ChartError(CalcSkillError):
     """Error for chart operations."""
 
 
+class DocumentNotFoundError(CalcSkillError):
+    """Error when document file is not found."""
+
+
 class ValidationError(CalcSkillError):
     """Error for validation rule operations."""
 
@@ -38,5 +42,6 @@ __all__ = [
     "InvalidCellReferenceError",
     "FormulaError",
     "ChartError",
+    "DocumentNotFoundError",
     "ValidationError",
 ]

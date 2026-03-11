@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from calc.exceptions import ChartError
+from calc.exceptions import ChartError, DocumentNotFoundError
 from uno_bridge import uno_context
 
 
@@ -54,6 +54,8 @@ def create_chart(
     if chart_type not in CHART_TYPES:
         raise ChartError(f"Unsupported chart type: {chart_type}")
     file_path = Path(path)
+    if not file_path.exists():
+        raise DocumentNotFoundError(f"Document not found: {path}")
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()

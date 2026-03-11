@@ -4,7 +4,7 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from calc.exceptions import CalcSkillError
+from calc.exceptions import CalcSkillError, DocumentNotFoundError
 from uno_bridge import uno_context
 
 
@@ -22,10 +22,6 @@ class InvalidAreaError(SnapshotError):
 
 class FilterError(SnapshotError):
     """Error when PNG export filter fails."""
-
-
-class DocumentNotFoundError(SnapshotError):
-    """Error when document file is not found."""
 
 
 @dataclass

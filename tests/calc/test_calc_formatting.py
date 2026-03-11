@@ -1,5 +1,7 @@
 """Tests for Calc formatting helpers."""
 
+import pytest
+
 
 def test_apply_currency_format(tmp_path) -> None:
     from calc.core import create_spreadsheet
@@ -54,3 +56,11 @@ def test_apply_color_accepts_name(tmp_path) -> None:
             assert cell.CharColor == 0x000080
         finally:
             doc.close(True)
+
+
+def test_apply_format_raises_on_missing_file(tmp_path) -> None:
+    from calc.exceptions import DocumentNotFoundError
+    from calc.formatting import apply_format
+
+    with pytest.raises(DocumentNotFoundError):
+        apply_format(str(tmp_path / "missing.ods"), "Sheet1", 0, 0, {"bold": True})

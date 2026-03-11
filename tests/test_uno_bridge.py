@@ -1,5 +1,8 @@
 """Test UNO bridge functionality."""
 
+import importlib.util
+import sys
+
 import pytest
 
 
@@ -31,3 +34,54 @@ def test_uno_context_connection(tmp_path):
             assert doc.supportsService("com.sun.star.text.TextDocument")
         finally:
             doc.close(True)
+
+
+def test_find_libreoffice_uses_path_lookup_before_common_paths(monkeypatch):
+    """find_libreoffice returns the first executable found on PATH."""
+    import shutil
+
+    from uno_bridge import find_libreoffice
+
+    def fake_which(executable):
+        if executable == "soffice":
+            return "/custom/bin/soffice"
+        return None
+
+    monkeypatch.setattr(shutil, "which", fake_which)
+
+    assert find_libreoffice() == "/custom/bin/soffice"
+
+
+def test_resolve_uno_module_adds_env_path_and_checks_uno(monkeypatch, tmp_path):
+    """_resolve_uno_module inserts env override path before retrying import."""
+    from uno_bridge import _resolve_uno_module
+
+    env_path = tmp_path / "program"
+    env_path.mkdir()
+    checks = []
+
+    original_find_spec = importlib.util.find_spec
+    original_sys_path = list(sys.path)
+
+    def fake_find_spec(name):
+        if name != "uno":
+            return original_find_spec(name)
+        checks.append(list(sys.path))
+        if str(env_path) in sys.path:
+            return object()
+        return None
+
+    def fake_find_libreoffice():
+        return None
+
+    monkeypatch.setattr(importlib.util, "find_spec", fake_find_spec)
+    monkeypatch.setattr("uno_bridge.find_libreoffice", fake_find_libreoffice)
+    monkeypatch.setattr(sys, "path", original_sys_path)
+    monkeypatch.setenv("LIBREOFFICE_PROGRAM_PATH", str(env_path))
+
+    _resolve_uno_module()
+
+    assert sys.path[0] == str(env_path)
+    assert len(checks) >= 2
+    assert str(env_path) not in checks[0]
+    assert str(env_path) in checks[-1]
