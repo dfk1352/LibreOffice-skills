@@ -1,5 +1,7 @@
 """Tests for Writer snapshot (page-level PNG export)."""
 
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 import pytest
 
 
@@ -76,12 +78,13 @@ def test_snapshot_page_missing_doc_raises(tmp_path):
 def test_snapshot_page_creates_png(tmp_path):
     """snapshot_page creates a valid PNG file with non-zero size."""
     from writer.core import create_document
-    from writer.text import insert_text
+    from writer import open_writer_session
     from writer.snapshot import snapshot_page
 
     doc_path = tmp_path / "test.odt"
     create_document(str(doc_path))
-    insert_text(str(doc_path), "Hello Writer Snapshot")
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_text("Hello Writer Snapshot")
 
     out_path = tmp_path / "snapshot.png"
     result = snapshot_page(str(doc_path), str(out_path))

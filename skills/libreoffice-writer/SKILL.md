@@ -1,130 +1,182 @@
 ---
 name: libreoffice-writer
-description: Use when creating, editing, formatting, or extracting LibreOffice Writer (.odt) documents via UNO, including text insertion, tables, images, metadata, and paragraph styling.
+description: Use when creating, editing, formatting, exporting, or extracting LibreOffice Writer (.odt) documents via UNO, including session-based edits, tables, images, metadata, patch workflows, and snapshots.
 ---
 
 # LibreOffice Writer
 
-## Overview
-Use the `writer` modules to create and edit Writer documents
-with UNO-backed operations. Prefer the high-level functions in these modules
-instead of raw UNO calls or a CLI.
+Use the bundled `writer` modules for UNO-backed Writer document work.
+All paths must be **absolute**. Bundled modules live under `scripts/` in this
+skill directory — set `PYTHONPATH=<skill_base_dir>/scripts`.
 
-## Quick Reference
-- `core.create_document(path)`
-- `core.read_document_text(path)`
-- `text.insert_text(path, text, position=None)`
-- `text.replace_text(path, old, new)`
-- `formatting.apply_formatting(path, formatting, selection="all")`
-- `tables.add_table(path, rows, cols, data=None, position=None)`
-- `images.insert_image(path, image_path, width=None, height=None, position=None)`
-- `metadata.set_metadata(path, metadata)`
-- `metadata.get_metadata(path)`
-- `snapshot.snapshot_page(doc_path, output_path, page=1, dpi=150)`
-- `colors.resolve_color(color)`
+## API Surface
 
-## Usage Notes
-- Use absolute file paths for documents and images.
-- Ensure the bundled modules are on `PYTHONPATH`.
-  The modules are bundled under `scripts/` in this skill directory. Set:
-  `PYTHONPATH=<skill_base_dir>/scripts` where `<skill_base_dir>` is the base
-  directory reported when this skill was loaded (e.g. the path shown as
-  "Base directory" in the skill output).
-- Import modules directly from `writer`; do not search for
-  a separate CLI or external skill registry.
-- `position` is a character index; `0` inserts at the start, `None` at the end.
-- For title/body styling, insert text, then call
-  `apply_formatting(..., selection="last_paragraph")`.
-- Color fields accept either a `0xRRGGBB` integer or a CSS color name string.
-
-## Example: Create a Simple Report
 ```python
-from pathlib import Path
+# Lifecycle
+create_document(path)
+export_document(path, output_path, format)   # formats: "pdf", "docx"
 
-from writer.core import create_document
-from writer.formatting import apply_formatting
-from writer.metadata import set_metadata
-from writer.images import insert_image
-from writer.tables import add_table
-from writer.text import insert_text
+# Session (primary editing API)
+open_writer_session(path) -> WriterSession   # use as context manager
 
-output = Path("test-output/report.odt").resolve()
-create_document(str(output))
+WriterSession methods:
+  read_text(selector=None) -> str
+  insert_text(text, selector=None)
+  replace_text(selector, new_text)
+  delete_text(selector)
+  insert_table(rows, cols, data=None, name=None, selector=None)
+  update_table(selector, data)
+  delete_table(selector)
+  insert_image(image_path, width=None, height=None, name=None, selector=None)
+  update_image(selector, image_path=None, width=None, height=None)
+  delete_image(selector)
+  patch(patch_text, mode="atomic") -> PatchApplyResult
+  export(output_path, format)                # exports current in-memory state
+  reset()                                    # discard unsaved changes
+  close(save=True)
 
-set_metadata(
-    str(output),
-    {"title": "Quarterly Report", "author": "Ops"},
-)
-
-insert_text(str(output), "Quarterly Report", position=None)
-apply_formatting(
-    str(output),
-    {"bold": True, "font_size": 18, "align": "center"},
-    selection="last_paragraph",
-)
-insert_text(str(output), "\n\nSummary", position=None)
-insert_text(str(output), "[Draft] ", position=0)
-apply_formatting(
-    str(output),
-    {"bold": True, "font_size": 12, "align": "left"},
-    selection="last_paragraph",
-)
-
-add_table(
-    str(output),
-    2,
-    2,
-    [["Metric", "Value"], ["Revenue", "$1M"]],
-    position=5,
-)
-
-insert_image(
-    str(output),
-    "/abs/path/to/logo.png",
-    width=5000,
-    height=5000,
-    position=12,
-)
+# Standalone utilities
+patch(path, patch_text, mode="atomic") -> PatchApplyResult
+snapshot_page(doc_path, output_path, page=1, dpi=150)
+metadata.set_metadata(path, metadata)
+metadata.get_metadata(path)
+formatting.apply_formatting(path, formatting, selection="all")
+  # selection: "all" | "last_paragraph"
+  # formatting keys: bold, font_size, align, color, ...
 ```
 
-## Common Mistakes
-- Forgetting to create the document before inserting content.
-- Passing a relative path (UNO loads absolute URLs).
-- Looking for a CLI instead of using the Python modules.
-- Using `position` without accounting for existing text length.
+## Selectors
 
-## Visual Snapshots
+Selectors target content for reads, edits, and insertions.
 
-Use `snapshot.snapshot_page()` to capture a page as PNG for layout verification.
+| Selector | Applies to | Behaviour |
+|---|---|---|
+| `contains:"text"` | text | match the exact span |
+| `after:"text"` | text | insert as a new paragraph after the match |
+| `before:"text"` | text | insert as a new paragraph before the match |
+| `name:"ObjectName"` | table, image | match by name (case-insensitive, spaces→underscores) |
+| `index:0` | table, image | match by 0-based position |
+
+Omit `selector` to operate at the end of the document (for inserts) or on the
+whole document (for reads).
+
+## Patch DSL
+
+Use `patch()` to apply multiple ordered operations in one call.
+
+```toml
+[operation]
+type = insert_text
+# selector = after:"Introduction"   (optional)
+text = New paragraph content.
+
+[operation]
+type = replace_text
+selector = contains:"old phrase"
+new_text = replacement
+
+[operation]
+type = delete_text
+selector = contains:"remove this"
+
+[operation]
+type = insert_table
+rows = 2
+cols = 3
+# selector, name, data (JSON array of arrays) are all optional
+data = [["A","B","C"],["1","2","3"]]
+name = MyTable
+
+[operation]
+type = update_table
+selector = name:"MyTable"
+data = [["A","B","C"],["4","5","6"]]
+
+[operation]
+type = delete_table
+selector = index:0
+
+[operation]
+type = insert_image
+image_path = /abs/path/to/logo.png
+# width, height (hundredths of mm), selector, name are all optional
+
+[operation]
+type = update_image
+selector = name:"Logo"
+image_path = /abs/path/to/new.png
+
+[operation]
+type = delete_image
+selector = name:"Logo"
+```
+
+**Modes:**
+- `atomic` (default) — stop on first failure; revert document to pre-patch state
+- `best_effort` — continue past failures; report partial success
+
+`PatchApplyResult` fields: `mode`, `overall_status` (`"ok"` | `"partial"` | `"failed"`),
+`operations` (list of `PatchOperationResult`), `document_persisted`.
+
+## Example: Build a Report
+
+```python
+from pathlib import Path
+from writer import open_writer_session
+from writer.core import create_document, export_document
+from writer.formatting import apply_formatting
+from writer.metadata import set_metadata
+
+output = str(Path("test-output/report.odt").resolve())
+
+create_document(output)
+set_metadata(output, {"title": "Quarterly Report", "author": "Ops"})
+
+with open_writer_session(output) as session:
+    session.insert_text("Quarterly Report")
+    session.insert_table(2, 2, [["Metric", "Value"], ["Revenue", "$1M"]], name="Summary")
+    session.insert_image("/abs/path/logo.png", width=5000, height=5000, name="Logo")
+
+apply_formatting(output, {"bold": True, "font_size": 18, "align": "center"},
+                 selection="last_paragraph")
+export_document(output, "test-output/report.pdf", "pdf")
+```
+
+## Example: Patch Existing Document
+
+```python
+from writer import patch
+
+result = patch("/abs/path/report.odt", """
+[operation]
+type = update_table
+selector = name:"Summary"
+data = [["Metric","Value"],["Revenue","$2M"]]
+
+[operation]
+type = delete_image
+selector = name:"Logo"
+""", mode="best_effort")
+
+print(result.overall_status)   # "ok" | "partial" | "failed"
+```
+
+## Snapshots
 
 ```python
 from writer.snapshot import snapshot_page
 
-result = snapshot_page(str(doc_path), "/tmp/page1.png", page=1, dpi=150)
-# result.file_path, result.width, result.height, result.dpi
+result = snapshot_page(doc_path, "/tmp/page1.png", page=1, dpi=150)
+# result.file_path, result.width, result.height
+Path(result.file_path).unlink(missing_ok=True)  # clean up after verification
 ```
 
-**Parameters:**
-- `doc_path`: Absolute path to the Writer document.
-- `output_path`: File path for the PNG output.
-- `page`: 1-indexed page number (default: 1).
-- `dpi`: Export resolution (default: 150).
+Use snapshots to verify layout after inserting images or applying formatting.
+Check for overlapping elements, cut-off content, or misaligned objects.
 
-**When to snapshot:**
-- After inserting images to confirm alignment.
-- After applying formatting to verify layout.
-- Before finalizing a document for delivery.
+## Common Mistakes
 
-**Cleanup:** Remove snapshot PNGs after verification. Do not let temporary
-images accumulate.
-
-```python
-Path(result.file_path).unlink(missing_ok=True)
-```
-
-**Visual Red Flags:**
-- Overlapping elements (text over images, tables over images).
-- Cut-off text or tables at page boundaries.
-- Misaligned objects (images not centered, tables not aligned).
-- Inconsistent spacing between paragraphs.
-- Low contrast or unreadable text.
+- Passing a relative path — UNO requires absolute paths.
+- Forgetting `create_document()` before opening a session.
+- Using `contains:` when you want an insertion point — use `after:` or `before:`.
+- Calling `session.export()` after `session.close()` — export before closing.

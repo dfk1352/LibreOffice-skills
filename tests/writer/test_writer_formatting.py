@@ -16,14 +16,15 @@ def test_apply_formatting_rejects_unknown_keys(tmp_path):
 
 
 def test_apply_character_formatting(tmp_path):
+    from writer import open_writer_session
     from writer.core import create_document
-    from writer.text import insert_text
     from writer.formatting import apply_formatting
     from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_char_format.odt"
     create_document(str(doc_path))
-    insert_text(str(doc_path), "Test text for formatting")
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_text("Test text for formatting")
 
     # Apply character formatting
     apply_formatting(str(doc_path), {"bold": True, "italic": True, "underline": True})
@@ -43,14 +44,15 @@ def test_apply_character_formatting(tmp_path):
 
 
 def test_apply_paragraph_formatting(tmp_path):
+    from writer import open_writer_session
     from writer.core import create_document
-    from writer.text import insert_text
     from writer.formatting import apply_formatting
     from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_para_format.odt"
     create_document(str(doc_path))
-    insert_text(str(doc_path), "Test paragraph")
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_text("Test paragraph")
 
     # Apply paragraph formatting
     apply_formatting(str(doc_path), {"align": "CENTER"})
@@ -80,14 +82,15 @@ def test_apply_paragraph_formatting_invalid_align(tmp_path):
 
 
 def test_apply_font_properties(tmp_path):
+    from writer import open_writer_session
     from writer.core import create_document
-    from writer.text import insert_text
     from writer.formatting import apply_formatting
     from uno_bridge import uno_context
 
     doc_path = tmp_path / "test_font.odt"
     create_document(str(doc_path))
-    insert_text(str(doc_path), "Font test")
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_text("Font test")
 
     # Apply font properties
     apply_formatting(str(doc_path), {"font_name": "Arial", "font_size": 14})
