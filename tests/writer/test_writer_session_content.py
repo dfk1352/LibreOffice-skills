@@ -7,12 +7,16 @@ from __future__ import annotations
 import pytest
 
 from tests.writer._helpers import (
+    ARABIC_NUMBERING_TYPE,
+    BULLET_NUMBERING_TYPE,
+    assert_list_items,
+    assert_text_formatting,
     create_test_image,
     get_graphic_names,
     get_graphic_size,
-    get_table_cell_value,
-    get_table_dimensions,
+    get_list_paragraphs,
     get_table_names,
+    get_text_properties,
 )
 
 
@@ -37,7 +41,7 @@ def test_session_insert_text_appends_to_end(tmp_path):
         assert session.read_text() == "Hello"
 
 
-def test_session_read_text_without_selector_returns_full_document(tmp_path):
+def test_session_read_text_without_target_returns_full_document(tmp_path):
     from writer import open_writer_session
 
     doc_path = tmp_path / "read_full.odt"
@@ -47,160 +51,148 @@ def test_session_read_text_without_selector_returns_full_document(tmp_path):
         assert session.read_text() == "Section 1\n\nSection 2\n\nTail"
 
 
-def test_session_read_text_with_selector_returns_only_matched_span(tmp_path):
-    from writer import open_writer_session
+def test_session_read_text_with_bounded_target_returns_only_window(tmp_path):
+    from writer import WriterTarget, open_writer_session
 
     doc_path = tmp_path / "read_partial.odt"
-    _create_document_with_text(doc_path, "Section 1\n\nSection 2\n\nTail")
+    _create_document_with_text(
+        doc_path,
+        "Overview\n\nFinancial Summary\n\nSection 2\n\nRisks\n\nTail",
+    )
 
     with open_writer_session(str(doc_path)) as session:
-        selected_text = session.read_text(selector='contains:"Section 2"')
+        selected_text = session.read_text(
+            target=WriterTarget(kind="text", after="Financial Summary", before="Risks")
+        )
 
     assert "Section 2" in selected_text
-    assert selected_text != "Section 1\n\nSection 2\n\nTail"
+    assert "Risks" not in selected_text
+    assert "Overview" not in selected_text
 
 
-def test_session_read_text_with_missing_selector_raises(tmp_path):
-    from writer import open_writer_session
-    from writer.exceptions import SelectorNoMatchError
-
-    doc_path = tmp_path / "read_missing.odt"
-    _create_document_with_text(doc_path, "Section 1\n\nSection 2")
-
-    with open_writer_session(str(doc_path)) as session:
-        with pytest.raises(SelectorNoMatchError):
-            session.read_text(selector='contains:"Missing"')
-
-
-def test_session_insert_text_after_anchor(tmp_path):
-    from writer import open_writer_session
+def test_session_insert_text_at_insertion_target_after_anchor(tmp_path):
+    from writer import WriterTarget, open_writer_session
 
     doc_path = tmp_path / "insert_after.odt"
     _create_document_with_text(doc_path, "Introduction\n\nBody")
 
     with open_writer_session(str(doc_path)) as session:
-        session.insert_text("\n\nInserted", selector='after:"Introduction"')
+        session.insert_text(
+            "Inserted",
+            target=WriterTarget(kind="insertion", after="Introduction"),
+        )
         text = session.read_text()
 
-    assert text.index("Introduction") < text.index("Inserted") < text.index("Body")
+    assert text == "Introduction\nInserted\n\nBody"
 
 
-def test_session_replace_text_replaces_matched_span(tmp_path):
-    from writer import open_writer_session
+def test_session_replace_text_uses_bounded_target_for_repeated_phrase(tmp_path):
+    from writer import WriterTarget, open_writer_session
 
     doc_path = tmp_path / "replace_text.odt"
-    _create_document_with_text(doc_path, "Keep this. Replace old text. Keep tail.")
+    _create_document_with_text(
+        doc_path,
+        "Section A\n\nShared phrase\n\nSection B\n\nShared phrase\n\nTail",
+    )
 
     with open_writer_session(str(doc_path)) as session:
-        session.replace_text('contains:"old text"', "new text")
+        session.replace_text(
+            WriterTarget(
+                kind="text", text="Shared phrase", after="Section B", before="Tail"
+            ),
+            "Updated phrase",
+        )
         text = session.read_text()
 
-    assert "new text" in text
-    assert "old text" not in text
+    assert text.count("Shared phrase") == 1
+    assert "Updated phrase" in text
 
 
-def test_session_delete_text_removes_matched_span(tmp_path):
-    from writer import open_writer_session
+def test_session_format_text_applies_character_formatting_to_targeted_phrase(tmp_path):
+    from writer import TextFormatting, WriterTarget, open_writer_session
 
-    doc_path = tmp_path / "delete_text.odt"
-    _create_document_with_text(doc_path, "Keep this. remove me. Keep tail.")
+    doc_path = tmp_path / "format_text.odt"
+    _create_document_with_text(
+        doc_path, "Financial Summary\n\nQuarterly revenue grew 18%."
+    )
 
     with open_writer_session(str(doc_path)) as session:
-        session.delete_text('contains:"remove me"')
-        text = session.read_text()
+        session.format_text(
+            WriterTarget(kind="text", text="Quarterly revenue grew 18%."),
+            TextFormatting(bold=True, italic=True, underline=True),
+        )
 
-    assert "remove me" not in text
-    assert "Keep this." in text
+    assert_text_formatting(
+        doc_path,
+        "Quarterly revenue grew 18%.",
+        char_weight=150.0,
+        char_underline=1,
+    )
+    assert (
+        "ITALIC"
+        in get_text_properties(doc_path, "Quarterly revenue grew 18%.")["char_posture"]
+    )
 
 
-def test_session_replace_text_missing_selector_raises(tmp_path):
-    from writer import open_writer_session
-    from writer.exceptions import SelectorNoMatchError
+def test_session_format_text_applies_paragraph_alignment_to_targeted_paragraph(
+    tmp_path,
+):
+    from writer import TextFormatting, WriterTarget, open_writer_session
 
-    doc_path = tmp_path / "replace_missing.odt"
+    doc_path = tmp_path / "format_alignment.odt"
+    _create_document_with_text(doc_path, "Heading\n\nCentered paragraph\n\nTail")
+
+    with open_writer_session(str(doc_path)) as session:
+        session.format_text(
+            WriterTarget(kind="text", text="Centered paragraph"),
+            TextFormatting(align="center"),
+        )
+
+    assert_text_formatting(doc_path, "Centered paragraph", align=2)
+
+
+def test_session_format_text_empty_payload_raises_invalid_formatting_error(tmp_path):
+    from writer import TextFormatting, WriterTarget, open_writer_session
+    from writer.exceptions import InvalidFormattingError
+
+    doc_path = tmp_path / "empty_formatting.odt"
     _create_document_with_text(doc_path, "Only existing text")
 
     with open_writer_session(str(doc_path)) as session:
-        with pytest.raises(SelectorNoMatchError):
-            session.replace_text('contains:"missing"', "new")
+        with pytest.raises(InvalidFormattingError):
+            session.format_text(
+                WriterTarget(kind="text", text="Only existing text"),
+                TextFormatting(),
+            )
 
 
-def test_session_insert_table_creates_named_table(tmp_path):
-    from writer import open_writer_session
+def test_session_table_crud_continues_to_work_with_writer_target(tmp_path):
+    from writer import WriterTarget, open_writer_session
     from writer.core import create_document
 
-    doc_path = tmp_path / "insert_table.odt"
+    doc_path = tmp_path / "table_crud.odt"
     create_document(str(doc_path))
 
     with open_writer_session(str(doc_path)) as session:
         session.insert_table(2, 3, [["A", "B", "C"], ["1", "2", "3"]], "T1")
+        session.update_table(
+            WriterTarget(kind="table", name="T1"),
+            [["X", "Y", "Z"], ["3", "4", "5"]],
+        )
 
-    assert "T1" in get_table_names(doc_path)
-    assert get_table_dimensions(doc_path, "T1") == (2, 3)
-    assert get_table_cell_value(doc_path, "T1", "B2") == "2"
-
-
-def test_session_update_table_updates_cell_contents(tmp_path):
-    from writer import open_writer_session
-    from writer.core import create_document
-
-    doc_path = tmp_path / "update_table.odt"
-    create_document(str(doc_path))
+    assert get_table_names(doc_path) == ["T1"]
 
     with open_writer_session(str(doc_path)) as session:
-        session.insert_table(2, 2, [["A", "B"], ["1", "2"]], "T1")
-        session.update_table('name:"T1"', [["X", "Y"], ["3", "4"]])
+        session.delete_table(WriterTarget(kind="table", index=0))
 
-    assert get_table_cell_value(doc_path, "T1", "A1") == "X"
-    assert get_table_cell_value(doc_path, "T1", "B2") == "4"
+    assert get_table_names(doc_path) == []
 
 
-def test_session_delete_table_removes_named_table(tmp_path):
-    from writer import open_writer_session
+def test_session_image_crud_continues_to_work_with_writer_target(tmp_path):
+    from writer import WriterTarget, open_writer_session
     from writer.core import create_document
 
-    doc_path = tmp_path / "delete_table.odt"
-    create_document(str(doc_path))
-
-    with open_writer_session(str(doc_path)) as session:
-        session.insert_table(1, 1, [["gone"]], "T1")
-        session.delete_table('name:"T1"')
-
-    assert "T1" not in get_table_names(doc_path)
-
-
-def test_session_delete_table_unknown_name_raises(tmp_path):
-    from writer import open_writer_session
-    from writer.core import create_document
-    from writer.exceptions import SelectorNoMatchError
-
-    doc_path = tmp_path / "delete_missing_table.odt"
-    create_document(str(doc_path))
-
-    with open_writer_session(str(doc_path)) as session:
-        with pytest.raises(SelectorNoMatchError):
-            session.delete_table('name:"Missing Table"')
-
-
-def test_session_insert_image_creates_named_graphic(tmp_path):
-    from writer import open_writer_session
-    from writer.core import create_document
-
-    doc_path = tmp_path / "insert_image.odt"
-    image_path = create_test_image(tmp_path / "insert_image.png", color="blue")
-    create_document(str(doc_path))
-
-    with open_writer_session(str(doc_path)) as session:
-        session.insert_image(str(image_path), name="Logo")
-
-    assert "Logo" in get_graphic_names(doc_path)
-
-
-def test_session_update_image_replaces_properties_of_named_graphic(tmp_path):
-    from writer import open_writer_session
-    from writer.core import create_document
-
-    doc_path = tmp_path / "update_image.odt"
+    doc_path = tmp_path / "image_crud.odt"
     first_image = create_test_image(tmp_path / "first.png", color="blue")
     second_image = create_test_image(tmp_path / "second.png", color="green")
     create_document(str(doc_path))
@@ -208,7 +200,7 @@ def test_session_update_image_replaces_properties_of_named_graphic(tmp_path):
     with open_writer_session(str(doc_path)) as session:
         session.insert_image(str(first_image), width=2000, height=2000, name="Logo")
         session.update_image(
-            'name:"Logo"',
+            WriterTarget(kind="image", name="Logo"),
             image_path=str(second_image),
             width=4000,
             height=3000,
@@ -217,31 +209,143 @@ def test_session_update_image_replaces_properties_of_named_graphic(tmp_path):
     width, height = get_graphic_size(doc_path, "Logo")
     assert abs(width - 4000) <= 1
     assert abs(height - 3000) <= 1
-
-
-def test_session_delete_image_removes_named_graphic(tmp_path):
-    from writer import open_writer_session
-    from writer.core import create_document
-
-    doc_path = tmp_path / "delete_image.odt"
-    image_path = create_test_image(tmp_path / "delete.png", color="black")
-    create_document(str(doc_path))
+    assert get_graphic_names(doc_path) == ["Logo"]
 
     with open_writer_session(str(doc_path)) as session:
-        session.insert_image(str(image_path), name="Logo")
-        session.delete_image('name:"Logo"')
+        session.delete_image(WriterTarget(kind="image", index=0))
 
     assert get_graphic_names(doc_path) == []
 
 
-def test_session_insert_image_missing_file_raises(tmp_path):
-    from writer import open_writer_session
+def test_session_insert_list_creates_unordered_list_in_order(tmp_path):
+    from writer import ListItem, WriterTarget, open_writer_session
     from writer.core import create_document
-    from writer.exceptions import ImageNotFoundError
 
-    doc_path = tmp_path / "missing_image.odt"
+    doc_path = tmp_path / "unordered_list.odt"
     create_document(str(doc_path))
 
     with open_writer_session(str(doc_path)) as session:
-        with pytest.raises(ImageNotFoundError):
-            session.insert_image(str(tmp_path / "missing.png"), name="Logo")
+        session.insert_text("Action Items")
+        session.insert_list(
+            [
+                ListItem(text="Confirm scope", level=0),
+                ListItem(text="Review output", level=0),
+            ],
+            ordered=False,
+            target=WriterTarget(kind="insertion", after="Action Items"),
+        )
+
+    assert_list_items(
+        doc_path,
+        ["Confirm scope", "Review output"],
+        expected_levels=[0, 0],
+        expected_numbering_type=BULLET_NUMBERING_TYPE,
+    )
+
+
+def test_session_insert_list_creates_ordered_list_when_requested(tmp_path):
+    from writer import ListItem, open_writer_session
+    from writer.core import create_document
+
+    doc_path = tmp_path / "ordered_list.odt"
+    create_document(str(doc_path))
+
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_list(
+            [ListItem(text="First", level=0), ListItem(text="Second", level=0)],
+            ordered=True,
+        )
+
+    assert_list_items(
+        doc_path,
+        ["First", "Second"],
+        expected_levels=[0, 0],
+        expected_numbering_type=ARABIC_NUMBERING_TYPE,
+    )
+
+
+def test_session_insert_list_supports_nested_items(tmp_path):
+    from writer import ListItem, open_writer_session
+    from writer.core import create_document
+
+    doc_path = tmp_path / "nested_list.odt"
+    create_document(str(doc_path))
+
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_list(
+            [
+                ListItem(text="Parent", level=0),
+                ListItem(text="Child", level=1),
+                ListItem(text="Sibling", level=0),
+            ],
+            ordered=False,
+        )
+
+    assert_list_items(
+        doc_path,
+        ["Parent", "Child", "Sibling"],
+        expected_levels=[0, 1, 0],
+        expected_numbering_type=BULLET_NUMBERING_TYPE,
+    )
+
+
+def test_session_replace_list_replaces_existing_list_and_updates_ordering(tmp_path):
+    from writer import ListItem, WriterTarget, open_writer_session
+    from writer.core import create_document
+
+    doc_path = tmp_path / "replace_list.odt"
+    create_document(str(doc_path))
+
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_text("Action Items\n\nRisks")
+        session.insert_list(
+            [ListItem(text="Old item", level=0)],
+            ordered=False,
+            target=WriterTarget(kind="insertion", after="Action Items"),
+        )
+        session.replace_list(
+            WriterTarget(
+                kind="list", text="Old item", after="Action Items", before="Risks"
+            ),
+            [
+                ListItem(text="Confirm scope", level=0),
+                ListItem(text="Update packaging", level=1),
+            ],
+            ordered=True,
+        )
+
+    assert_list_items(
+        doc_path,
+        ["Confirm scope", "Update packaging"],
+        expected_levels=[0, 1],
+        expected_numbering_type=ARABIC_NUMBERING_TYPE,
+    )
+
+
+def test_session_delete_list_removes_targeted_list(tmp_path):
+    from writer import ListItem, WriterTarget, open_writer_session
+    from writer.core import create_document
+
+    doc_path = tmp_path / "delete_list.odt"
+    create_document(str(doc_path))
+
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_list([ListItem(text="Remove me", level=0)], ordered=False)
+        session.delete_list(WriterTarget(kind="list", text="Remove me"))
+
+    assert get_list_paragraphs(doc_path) == []
+
+
+def test_session_invalid_list_payloads_raise_invalid_list_error(tmp_path):
+    from writer import ListItem, open_writer_session
+    from writer.core import create_document
+    from writer.exceptions import InvalidListError
+
+    doc_path = tmp_path / "invalid_list.odt"
+    create_document(str(doc_path))
+
+    with open_writer_session(str(doc_path)) as session:
+        with pytest.raises(InvalidListError):
+            session.insert_list([], ordered=False)
+        with pytest.raises(InvalidListError):
+            session.insert_list([ListItem(text="Bad", level=-1)], ordered=False)

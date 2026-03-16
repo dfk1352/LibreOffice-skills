@@ -4,14 +4,32 @@
 
 from __future__ import annotations
 
+from tests.writer._helpers import (
+    ARABIC_NUMBERING_TYPE,
+    BULLET_NUMBERING_TYPE,
+    assert_list_items,
+    assert_text_formatting,
+)
+
 
 def _create_seed_document(doc_path):
-    from writer import open_writer_session
+    from writer import ListItem, WriterTarget, open_writer_session
     from writer.core import create_document
 
     create_document(str(doc_path))
     with open_writer_session(str(doc_path)) as session:
-        session.insert_text("Introduction\n\nOld sentence.\n\nTail section.")
+        session.insert_text(
+            "Financial Summary\n\n"
+            "Quarterly revenue grew 18%.\n\n"
+            "Action Items\n\n"
+            "Risks\n\n"
+            "Tail section."
+        )
+        session.insert_list(
+            [ListItem(text="Legacy item", level=0)],
+            ordered=False,
+            target=WriterTarget(kind="insertion", after="Action Items"),
+        )
 
 
 def test_patch_atomic_mode_success_saves_document(tmp_path):
@@ -24,27 +42,40 @@ def test_patch_atomic_mode_success_saves_document(tmp_path):
         str(doc_path),
         "[operation]\n"
         "type = insert_text\n"
-        'selector = after:"Introduction"\n'
+        "target.kind = insertion\n"
+        "target.after = Financial Summary\n"
         "text = Inserted paragraph.\n"
         "[operation]\n"
-        "type = replace_text\n"
-        'selector = contains:"Old sentence."\n'
-        "new_text = Updated sentence.\n",
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = Quarterly revenue grew 18%.\n"
+        "format.bold = true\n"
+        "[operation]\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.after = Action Items\n"
+        "list.ordered = true\n"
+        'items = [{"text": "Confirm scope", "level": 0}, {"text": "Review output", "level": 0}]\n',
         mode="atomic",
     )
 
     assert result.mode == "atomic"
     assert result.overall_status == "ok"
     assert result.document_persisted is True
-    assert [operation.status for operation in result.operations] == ["ok", "ok"]
+    assert [operation.status for operation in result.operations] == ["ok", "ok", "ok"]
 
     with open_writer_session(str(doc_path)) as session:
         text = session.read_text()
 
-    assert "Introduction\nInserted paragraph." in text
     assert "Inserted paragraph." in text
-    assert "Updated sentence." in text
-    assert "Old sentence." not in text
+    assert "Quarterly revenue grew 18%." in text
+    assert_text_formatting(doc_path, "Quarterly revenue grew 18%.", char_weight=150.0)
+    assert_list_items(
+        doc_path,
+        ["Legacy item", "Confirm scope", "Review output"],
+        expected_levels=[0, 0, 0],
+        expected_numbering_type=ARABIC_NUMBERING_TYPE,
+    )
 
 
 def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
@@ -57,11 +88,20 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
         str(doc_path),
         "[operation]\n"
         "type = insert_text\n"
-        'selector = after:"Introduction"\n'
+        "target.kind = insertion\n"
+        "target.after = Financial Summary\n"
         "text = Should not persist.\n"
         "[operation]\n"
-        "type = delete_text\n"
-        'selector = contains:"does not exist"\n',
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = missing text\n"
+        "format.italic = true\n"
+        "[operation]\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.after = Risks\n"
+        "list.ordered = false\n"
+        'items = [{"text": "Skipped later", "level": 0}]\n',
         mode="atomic",
     )
 
@@ -70,12 +110,19 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
     assert result.document_persisted is False
     assert result.operations[0].status == "ok"
     assert result.operations[1].status == "failed"
+    assert result.operations[2].status == "skipped"
 
     with open_writer_session(str(doc_path)) as session:
         text = session.read_text()
 
     assert "Should not persist." not in text
-    assert text == "Introduction\n\nOld sentence.\n\nTail section."
+    assert "Quarterly revenue grew 18%." in text
+    assert_list_items(
+        doc_path,
+        ["Legacy item"],
+        expected_levels=[0],
+        expected_numbering_type=BULLET_NUMBERING_TYPE,
+    )
 
 
 def test_patch_best_effort_mode_records_partial_success(tmp_path):
@@ -87,16 +134,21 @@ def test_patch_best_effort_mode_records_partial_success(tmp_path):
     result = patch(
         str(doc_path),
         "[operation]\n"
-        "type = insert_text\n"
-        'selector = after:"Introduction"\n'
-        "text = First success.\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.after = Risks\n"
+        "list.ordered = false\n"
+        'items = [{"text": "Best effort item", "level": 0}]\n'
         "[operation]\n"
-        "type = delete_text\n"
-        'selector = contains:"missing body"\n'
+        "type = replace_list\n"
+        "target.kind = list\n"
+        "target.text = missing item\n"
+        'items = [{"text": "never applied", "level": 0}]\n'
         "[operation]\n"
-        "type = replace_text\n"
-        'selector = contains:"Tail section."\n'
-        "new_text = Final section.\n",
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = Tail section.\n"
+        "format.underline = true\n",
         mode="best_effort",
     )
 
@@ -112,14 +164,18 @@ def test_patch_best_effort_mode_records_partial_success(tmp_path):
     with open_writer_session(str(doc_path)) as session:
         text = session.read_text()
 
-    assert "Introduction\nFirst success." in text
-    assert "First success." in text
-    assert "Final section." in text
-    assert "Tail section." not in text
+    assert "Best effort item" in text
+    assert "Tail section." in text
+    assert_list_items(
+        doc_path,
+        ["Legacy item", "Best effort item"],
+        expected_levels=[0, 0],
+    )
+    assert_text_formatting(doc_path, "Tail section.", char_underline=1)
 
 
-def test_patch_result_document_persisted_false_when_nothing_mutates(tmp_path):
-    from writer import patch
+def test_patch_result_document_persisted_true_only_when_changes_saved(tmp_path):
+    from writer import WriterTarget, open_writer_session, patch
     from writer.core import create_document
 
     doc_path = tmp_path / "empty_patch.odt"
@@ -130,6 +186,34 @@ def test_patch_result_document_persisted_false_when_nothing_mutates(tmp_path):
     assert result.overall_status == "ok"
     assert result.operations == []
     assert result.document_persisted is False
+
+    failed_result = patch(
+        str(doc_path),
+        "[operation]\n"
+        "type = delete_list\n"
+        "target.kind = list\n"
+        "target.text = missing item\n",
+        mode="best_effort",
+    )
+
+    assert failed_result.overall_status == "partial"
+    assert failed_result.document_persisted is False
+
+    with open_writer_session(str(doc_path)) as session:
+        session.insert_text("Financial Summary\n\nQuarterly revenue grew 18%.")
+        session_result = session.patch(
+            "[operation]\n"
+            "type = format_text\n"
+            "target.kind = text\n"
+            "target.text = Quarterly revenue grew 18%.\n"
+            "format.bold = true\n",
+            mode="atomic",
+        )
+        assert session_result.overall_status == "ok"
+        assert session_result.document_persisted is True
+        assert session.read_text(
+            WriterTarget(kind="text", text="Quarterly revenue grew 18%.")
+        ) == ("Quarterly revenue grew 18%.")
 
 
 def test_patch_result_preserves_original_operation_order(tmp_path):
@@ -144,17 +228,19 @@ def test_patch_result_preserves_original_operation_order(tmp_path):
         "type = insert_text\n"
         "text = First\n"
         "[operation]\n"
-        "type = replace_text\n"
-        'selector = contains:"Old sentence."\n'
-        "new_text = Second\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = Quarterly revenue grew 18%.\n"
+        "format.bold = true\n"
         "[operation]\n"
-        "type = delete_text\n"
-        'selector = contains:"Tail section."\n',
+        "type = delete_list\n"
+        "target.kind = list\n"
+        "target.text = Legacy item\n",
         mode="best_effort",
     )
 
     assert [operation.operation_type for operation in result.operations] == [
         "insert_text",
-        "replace_text",
-        "delete_text",
+        "format_text",
+        "delete_list",
     ]

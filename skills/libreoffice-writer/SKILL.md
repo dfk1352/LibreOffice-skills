@@ -1,182 +1,282 @@
 ---
 name: libreoffice-writer
-description: Use when creating, editing, formatting, exporting, or extracting LibreOffice Writer (.odt) documents via UNO, including session-based edits, tables, images, metadata, patch workflows, and snapshots.
+description: Use when creating, editing, formatting, exporting, or extracting LibreOffice Writer (.odt) documents via UNO, including session-based edits, structured text targets, tables, images, lists, patch workflows, and snapshots.
 ---
 
 # LibreOffice Writer
 
 Use the bundled `writer` modules for UNO-backed Writer document work.
 All paths must be **absolute**. Bundled modules live under `scripts/` in this
-skill directory — set `PYTHONPATH=<skill_base_dir>/scripts`.
+skill directory, so set `PYTHONPATH=<skill_base_dir>/scripts`.
+If setup or runtime issues appear, check `references/troubleshooting.md`.
 
 ## API Surface
 
 ```python
-# Lifecycle
+# Non-session utilities
 create_document(path)
 export_document(path, output_path, format)   # formats: "pdf", "docx"
+snapshot_page(doc_path, output_path, page=1, dpi=150)
 
 # Session (primary editing API)
-open_writer_session(path) -> WriterSession   # use as context manager
+open_writer_session(path) -> WriterSession
 
 WriterSession methods:
-  read_text(selector=None) -> str
-  insert_text(text, selector=None)
-  replace_text(selector, new_text)
-  delete_text(selector)
-  insert_table(rows, cols, data=None, name=None, selector=None)
-  update_table(selector, data)
-  delete_table(selector)
-  insert_image(image_path, width=None, height=None, name=None, selector=None)
-  update_image(selector, image_path=None, width=None, height=None)
-  delete_image(selector)
+  read_text(target: WriterTarget | None = None) -> str
+  insert_text(text, target: WriterTarget | None = None)
+  replace_text(target: WriterTarget, new_text)
+  delete_text(target: WriterTarget)
+  format_text(target: WriterTarget, formatting: TextFormatting)
+  insert_table(rows, cols, data=None, name=None, target: WriterTarget | None = None)
+  update_table(target: WriterTarget, data)
+  delete_table(target: WriterTarget)
+  insert_image(image_path, width=None, height=None, name=None, target: WriterTarget | None = None)
+  update_image(target: WriterTarget, image_path=None, width=None, height=None)
+  delete_image(target: WriterTarget)
+  insert_list(items: list[ListItem], ordered: bool, target: WriterTarget | None = None)
+  replace_list(target: WriterTarget, items: list[ListItem], ordered: bool | None = None)
+  delete_list(target: WriterTarget)
   patch(patch_text, mode="atomic") -> PatchApplyResult
-  export(output_path, format)                # exports current in-memory state
-  reset()                                    # discard unsaved changes
+  export(output_path, format)
+  reset()
   close(save=True)
 
-# Standalone utilities
+# Standalone patch utility
 patch(path, patch_text, mode="atomic") -> PatchApplyResult
-snapshot_page(doc_path, output_path, page=1, dpi=150)
-metadata.set_metadata(path, metadata)
-metadata.get_metadata(path)
-formatting.apply_formatting(path, formatting, selection="all")
-  # selection: "all" | "last_paragraph"
-  # formatting keys: bold, font_size, align, color, ...
 ```
 
-## Selectors
+## Structured Targets
 
-Selectors target content for reads, edits, and insertions.
+Use `WriterTarget` instead of selector strings.
 
-| Selector | Applies to | Behaviour |
+```python
+from writer import WriterTarget
+
+WriterTarget(
+    kind="text" | "insertion" | "table" | "image" | "list",
+    text=None,
+    after=None,
+    before=None,
+    occurrence=None,
+    name=None,
+    index=None,
+)
+```
+
+### Target kinds
+
+| Kind | Supported fields | Use |
 |---|---|---|
-| `contains:"text"` | text | match the exact span |
-| `after:"text"` | text | insert as a new paragraph after the match |
-| `before:"text"` | text | insert as a new paragraph before the match |
-| `name:"ObjectName"` | table, image | match by name (case-insensitive, spaces→underscores) |
-| `index:0` | table, image | match by 0-based position |
+| `text` | `text`, `after`, `before`, `occurrence` | Read, replace, delete, or format matched text |
+| `insertion` | `text`, `after`, `before`, `occurrence` | Insert at a resolved boundary or after a matched span |
+| `table` | `name` or `index` | Update/delete a table |
+| `image` | `name` or `index` | Update/delete an image |
+| `list` | `text`, `after`, `before`, `occurrence` | Replace/delete one logical list block |
 
-Omit `selector` to operate at the end of the document (for inserts) or on the
-whole document (for reads).
+### Resolution rules
+
+- Omit `target` to read the full document or append inserted content at the end.
+- Use `after` and `before` to constrain a search window.
+- Use `occurrence` when repeated text is expected; otherwise matching must be unique.
+- Prefer full sentences or distinctive paragraph-sized phrases for `text`, `after`, and `before` anchors; single-word anchors are often too brittle for realistic prose edits.
+- For table/image targets, prefer `name`; use `index` only when order is stable.
+- For insertion after inline text, Writer inserts at the boundary after the matched span; paragraph breaks must come from the inserted text or the session helper.
+
+## Formatting Payload
+
+```python
+from writer import TextFormatting
+
+TextFormatting(
+    bold=None,
+    italic=None,
+    underline=None,
+    font_name=None,
+    font_size=None,
+    color=None,          # named color or integer
+    align=None,          # "left" | "center" | "right" | "justify"
+    line_spacing=None,
+    spacing_before=None,
+    spacing_after=None,
+)
+```
+
+Notes:
+
+- Character and paragraph formatting can be combined in one call.
+- Paragraph properties such as `align` apply to the full paragraph containing the match, not just the exact matched span.
+- At least one formatting field must be set.
+
+## List Items
+
+```python
+from writer import ListItem
+
+ListItem(text="Confirm scope", level=0)
+```
+
+- `level` is zero-based nesting.
+- Nesting cannot skip levels.
+- `ordered=True` uses a numbering style; `ordered=False` uses bullets.
 
 ## Patch DSL
 
-Use `patch()` to apply multiple ordered operations in one call.
+Use `patch()` or `session.patch()` to apply ordered operations.
 
-```toml
+```ini
 [operation]
-type = insert_text
-# selector = after:"Introduction"   (optional)
-text = New paragraph content.
-
-[operation]
-type = replace_text
-selector = contains:"old phrase"
-new_text = replacement
-
-[operation]
-type = delete_text
-selector = contains:"remove this"
+type = format_text
+target.kind = text
+target.text = Quarterly revenue grew 18%.
+target.after = Financial Summary
+target.before = Action Items
+format.bold = true
+format.align = center
 
 [operation]
-type = insert_table
-rows = 2
-cols = 3
-# selector, name, data (JSON array of arrays) are all optional
-data = [["A","B","C"],["1","2","3"]]
-name = MyTable
-
-[operation]
-type = update_table
-selector = name:"MyTable"
-data = [["A","B","C"],["4","5","6"]]
-
-[operation]
-type = delete_table
-selector = index:0
-
-[operation]
-type = insert_image
-image_path = /abs/path/to/logo.png
-# width, height (hundredths of mm), selector, name are all optional
-
-[operation]
-type = update_image
-selector = name:"Logo"
-image_path = /abs/path/to/new.png
-
-[operation]
-type = delete_image
-selector = name:"Logo"
+type = insert_list
+target.kind = insertion
+target.after = Action Items
+list.ordered = false
+items <<JSON
+[
+  {"text": "Confirm scope", "level": 0},
+  {"text": "Review output", "level": 0},
+  {"text": "Update packaging", "level": 1}
+]
+JSON
 ```
 
-**Modes:**
-- `atomic` (default) — stop on first failure; revert document to pre-patch state
-- `best_effort` — continue past failures; report partial success
+### Supported operation types
 
-`PatchApplyResult` fields: `mode`, `overall_status` (`"ok"` | `"partial"` | `"failed"`),
-`operations` (list of `PatchOperationResult`), `document_persisted`.
+- `insert_text`
+- `replace_text`
+- `delete_text`
+- `format_text`
+- `insert_table`
+- `update_table`
+- `delete_table`
+- `insert_image`
+- `update_image`
+- `delete_image`
+- `insert_list`
+- `replace_list`
+- `delete_list`
 
-## Example: Build a Report
+### Patch value rules
+
+- Use `target.*` fields for target definition.
+- Use `format.*` fields for formatting payloads.
+- Use `list.ordered` plus JSON `items` for list operations.
+- `items` and `data` must be valid JSON.
+- Heredoc blocks are supported with `<<TAG ... TAG` for multiline text or JSON.
+- Legacy `selector = ...` syntax is not supported.
+
+### Modes
+
+- `atomic` stops on first failure, resets the session, and persists nothing.
+- `best_effort` keeps successful earlier operations and records failures.
+
+`PatchApplyResult` fields:
+
+- `mode`
+- `overall_status` = `"ok" | "partial" | "failed"`
+- `operations` = list of `PatchOperationResult`
+- `document_persisted`
+
+For standalone `patch(path, ...)`, `document_persisted` means the changes were
+saved to disk. For `session.patch(...)`, it means the patch produced successful
+mutations in the current open session state.
+
+## Example: Edit a Report in Session
 
 ```python
 from pathlib import Path
-from writer import open_writer_session
-from writer.core import create_document, export_document
-from writer.formatting import apply_formatting
-from writer.metadata import set_metadata
+
+from writer import ListItem, TextFormatting, WriterTarget, open_writer_session
+from writer.core import create_document
 
 output = str(Path("test-output/report.odt").resolve())
-
 create_document(output)
-set_metadata(output, {"title": "Quarterly Report", "author": "Ops"})
 
 with open_writer_session(output) as session:
-    session.insert_text("Quarterly Report")
-    session.insert_table(2, 2, [["Metric", "Value"], ["Revenue", "$1M"]], name="Summary")
-    session.insert_image("/abs/path/logo.png", width=5000, height=5000, name="Logo")
-
-apply_formatting(output, {"bold": True, "font_size": 18, "align": "center"},
-                 selection="last_paragraph")
-export_document(output, "test-output/report.pdf", "pdf")
+    session.insert_text(
+        "Executive Summary\n\n"
+        "Financial Summary\n\n"
+        "Quarterly revenue grew 18%.\n\n"
+        "Action Items"
+    )
+    session.format_text(
+        WriterTarget(
+            kind="text",
+            text="Quarterly revenue grew 18%.",
+            after="Financial Summary",
+            before="Action Items",
+        ),
+        TextFormatting(bold=True, align="center"),
+    )
+    session.insert_list(
+        [
+            ListItem(text="Confirm scope", level=0),
+            ListItem(text="Review output", level=0),
+            ListItem(text="Update packaging", level=1),
+        ],
+        ordered=False,
+        target=WriterTarget(kind="insertion", after="Action Items"),
+    )
 ```
 
-## Example: Patch Existing Document
+## Example: Patch an Existing Document
 
 ```python
 from writer import patch
 
-result = patch("/abs/path/report.odt", """
+result = patch(
+    "/abs/path/report.odt",
+    """
+[operation]
+type = replace_text
+target.kind = text
+target.text = Draft
+new_text = Final
+
 [operation]
 type = update_table
-selector = name:"Summary"
-data = [["Metric","Value"],["Revenue","$2M"]]
+target.kind = table
+target.name = Summary
+data = [["Metric", "Value"], ["Revenue", "$2M"]]
 
 [operation]
-type = delete_image
-selector = name:"Logo"
-""", mode="best_effort")
+type = replace_list
+target.kind = list
+target.text = Confirm scope
+items = [{"text": "Approve release", "level": 0}, {"text": "Notify team", "level": 1}]
+list.ordered = true
+""",
+    mode="best_effort",
+)
 
-print(result.overall_status)   # "ok" | "partial" | "failed"
+print(result.overall_status)
 ```
 
 ## Snapshots
 
 ```python
-from writer.snapshot import snapshot_page
+from pathlib import Path
+from writer import snapshot_page
 
 result = snapshot_page(doc_path, "/tmp/page1.png", page=1, dpi=150)
-# result.file_path, result.width, result.height
-Path(result.file_path).unlink(missing_ok=True)  # clean up after verification
+print(result.file_path, result.width, result.height)
+Path(result.file_path).unlink(missing_ok=True)
 ```
 
-Use snapshots to verify layout after inserting images or applying formatting.
-Check for overlapping elements, cut-off content, or misaligned objects.
+Use snapshots to verify layout after formatting, list edits, image placement, or table changes.
 
 ## Common Mistakes
 
-- Passing a relative path — UNO requires absolute paths.
-- Forgetting `create_document()` before opening a session.
-- Using `contains:` when you want an insertion point — use `after:` or `before:`.
-- Calling `session.export()` after `session.close()` — export before closing.
+- Passing a relative path; UNO-facing Writer APIs expect absolute file paths.
+- Omitting `occurrence` for repeated text and then getting an ambiguity error.
+- Using anchors that are too short or too common; prefer full-sentence or paragraph-level anchor text plus `after` / `before` bounds when possible.
+- Expecting `align` to apply only to a phrase; Writer applies paragraph alignment to the containing paragraph.
+- Supplying malformed JSON in `items` or `data` patch fields.
+- Calling `session.export()` or other methods after `session.close()`.

@@ -7,6 +7,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from tests.writer._helpers import (
+    ARABIC_NUMBERING_TYPE,
+    BULLET_NUMBERING_TYPE,
+    assert_list_items,
+    assert_text_formatting,
     create_test_image,
     get_graphic_names,
     get_table_names,
@@ -14,45 +18,58 @@ from tests.writer._helpers import (
 
 
 def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
-    """Build Writer documents that exercise every public Writer tool."""
-    from writer import open_writer_session, patch
-    from writer.core import create_document, export_document
-    from writer.formatting import apply_formatting
-    from writer.metadata import get_metadata, set_metadata
-    from writer.snapshot import snapshot_page
+    """Build Writer documents that exercise every public Writer editing tool."""
+    from writer import (
+        ListItem,
+        TextFormatting,
+        WriterTarget,
+        open_writer_session,
+        patch,
+        snapshot_page,
+    )
+    from writer.core import create_document
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     session_doc = output_dir / "session_workflow.odt"
     create_document(str(session_doc))
-    set_metadata(
-        str(session_doc),
-        {
-            "title": "Writer Session Workflow",
-            "author": "Test Suite",
-            "subject": "Session and patch coverage",
-        },
-    )
-    metadata = get_metadata(str(session_doc))
-    assert metadata["title"] == "Writer Session Workflow"
-    assert metadata["author"] == "Test Suite"
 
     logo_v1 = create_test_image(output_dir / "logo_v1.png", color="blue")
     logo_v2 = create_test_image(output_dir / "logo_v2.png", color="green")
-    logo_patch = create_test_image(output_dir / "logo_patch.png", color="black")
 
     with open_writer_session(str(session_doc)) as session:
-        session.insert_text("Introduction\n\nBody paragraph.\n\nRemove this sentence.")
-        assert "Introduction" in session.read_text()
-        assert "Body paragraph." in session.read_text(
-            selector='contains:"Body paragraph."'
+        session.insert_text(
+            "Executive Summary\n\n"
+            "Financial Summary\n\n"
+            "Quarterly revenue grew 18%.\n\n"
+            "Action Items\n\n"
+            "Remove this sentence.\n\n"
+            "Risks\n\n"
+            "Appendix"
+        )
+        assert "Executive Summary" in session.read_text()
+        assert "Quarterly revenue grew 18%." in session.read_text(
+            target=WriterTarget(kind="text", text="Quarterly revenue grew 18%.")
         )
 
         session.insert_text(
-            "\n\nInserted after intro.", selector='after:"Introduction"'
+            "Inserted after summary.",
+            target=WriterTarget(kind="insertion", after="Executive Summary"),
         )
-        session.replace_text('contains:"Body paragraph."', "Updated body paragraph.")
-        session.delete_text('contains:"Remove this sentence."')
+        session.replace_text(
+            WriterTarget(kind="text", text="Quarterly revenue grew 18%."),
+            "Quarterly revenue grew 21%.",
+        )
+        session.delete_text(WriterTarget(kind="text", text="Remove this sentence."))
+        session.format_text(
+            WriterTarget(
+                kind="text",
+                text="Quarterly revenue grew 21%.",
+                after="Financial Summary",
+                before="Action Items",
+            ),
+            TextFormatting(bold=True, italic=True, align="center"),
+        )
 
         session.insert_table(
             2,
@@ -62,10 +79,10 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         )
         session.insert_table(1, 1, [["discard"]], "Temporary Table")
         session.update_table(
-            'name:"Quarterly Results"',
+            WriterTarget(kind="table", name="Quarterly Results"),
             [["Quarter", "Revenue"], ["Q1", "25"]],
         )
-        session.delete_table('name:"Temporary Table"')
+        session.delete_table(WriterTarget(kind="table", name="Temporary Table"))
 
         session.insert_image(
             str(logo_v1),
@@ -73,132 +90,166 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
             height=2000,
             name="Logo",
         )
-        session.insert_image(
-            str(logo_patch), width=1800, height=1800, name="Disposable"
-        )
+        session.insert_image(str(logo_v2), width=1800, height=1800, name="Disposable")
         session.update_image(
-            'name:"Logo"',
+            WriterTarget(kind="image", name="Logo"),
             image_path=str(logo_v2),
             width=3500,
             height=2500,
         )
-        session.delete_image('name:"Disposable"')
+        session.delete_image(WriterTarget(kind="image", name="Disposable"))
+
+        session.insert_list(
+            [
+                ListItem(text="Confirm scope", level=0),
+                ListItem(text="Review output", level=0),
+                ListItem(text="Update packaging", level=1),
+            ],
+            ordered=False,
+            target=WriterTarget(kind="insertion", after="Action Items"),
+        )
+        session.replace_list(
+            WriterTarget(
+                kind="list", text="Confirm scope", after="Action Items", before="Risks"
+            ),
+            [
+                ListItem(text="Confirm scope", level=0),
+                ListItem(text="Review output", level=0),
+                ListItem(text="Publish package", level=1),
+            ],
+            ordered=True,
+        )
+        session.delete_list(WriterTarget(kind="list", text="Publish package"))
+        session.insert_list(
+            [
+                ListItem(text="Escalate blocker", level=0),
+                ListItem(text="Collect approvals", level=1),
+            ],
+            ordered=False,
+            target=WriterTarget(kind="insertion", after="Risks"),
+        )
+
         session.patch(
             "[operation]\n"
             "type = insert_text\n"
-            'selector = after:"Updated body paragraph."\n'
+            "target.kind = insertion\n"
+            "target.after = Risks\n"
             "text = Patched paragraph.\n"
             "[operation]\n"
-            "type = insert_image\n"
-            "image_path = "
-            f"{logo_patch}\n"
-            "width = 2200\n"
-            "height = 2200\n"
-            "name = Patch Artifact\n"
+            "type = format_text\n"
+            "target.kind = text\n"
+            "target.text = Patched paragraph.\n"
+            "format.underline = true\n"
             "[operation]\n"
-            "type = insert_text\n"
-            "text = Closing note added by patch.\n",
+            "type = insert_list\n"
+            "target.kind = insertion\n"
+            "target.after = Patched paragraph.\n"
+            "list.ordered = false\n"
+            'items = [{"text": "Patched checklist", "level": 0}]\n',
             mode="atomic",
         )
-
-    snapshot_before = output_dir / "writer_snapshot_before.png"
-    snapshot_page(str(session_doc), str(snapshot_before), page=1)
-
-    apply_formatting(
-        str(session_doc),
-        {"italic": True, "color": 0x003366, "font_size": 14},
-        selection="all",
-    )
-    apply_formatting(
-        str(session_doc),
-        {"bold": True, "align": "center"},
-        selection="last_paragraph",
-    )
-
-    snapshot_after = output_dir / "writer_snapshot_after.png"
-    snapshot_page(str(session_doc), str(snapshot_after), page=1)
-
-    session_export = output_dir / "session_workflow.pdf"
-    with open_writer_session(str(session_doc)) as session:
-        session.export(str(session_export), "pdf")
 
     atomic_doc = output_dir / "patch_atomic.odt"
     create_document(str(atomic_doc))
     with open_writer_session(str(atomic_doc)) as session:
-        session.insert_text("Executive Summary\n\nLegacy sentence.")
+        session.insert_text(
+            "Executive Summary\n\n"
+            "Financial Summary\n\n"
+            "Quarterly revenue grew 18%.\n\n"
+            "Action Items"
+        )
 
     patch(
         str(atomic_doc),
         "[operation]\n"
         "type = insert_text\n"
-        'selector = after:"Executive Summary"\n'
+        "target.kind = insertion\n"
+        "target.after = Executive Summary\n"
         "text = Atomic addition.\n"
         "[operation]\n"
-        "type = replace_text\n"
-        'selector = contains:"Legacy sentence."\n'
-        "new_text = Modern sentence.\n",
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = Quarterly revenue grew 18%.\n"
+        "format.bold = true\n"
+        "[operation]\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.after = Action Items\n"
+        "list.ordered = true\n"
+        'items = [{"text": "Confirm scope", "level": 0}, {"text": "Review output", "level": 1}]\n',
         mode="atomic",
     )
-
-    atomic_export = output_dir / "patch_atomic.docx"
-    export_document(str(atomic_doc), str(atomic_export), "docx")
 
     best_effort_doc = output_dir / "patch_best_effort.odt"
     create_document(str(best_effort_doc))
     with open_writer_session(str(best_effort_doc)) as session:
-        session.insert_text("Status Report\n\nKeep this sentence.\n\nTail line.")
+        session.insert_text(
+            "Status Report\n\n"
+            "Financial Summary\n\n"
+            "Quarterly revenue grew 18%.\n\n"
+            "Action Items\n\n"
+            "Tail line."
+        )
 
     patch(
         str(best_effort_doc),
         "[operation]\n"
-        "type = insert_text\n"
-        'selector = after:"Status Report"\n'
-        "text = Best effort addition.\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.after = Action Items\n"
+        "list.ordered = false\n"
+        'items = [{"text": "Best effort addition", "level": 0}]\n'
         "[operation]\n"
-        "type = delete_text\n"
-        'selector = contains:"missing sentence"\n'
+        "type = replace_list\n"
+        "target.kind = list\n"
+        "target.text = missing sentence\n"
+        'items = [{"text": "No change", "level": 0}]\n'
         "[operation]\n"
-        "type = replace_text\n"
-        'selector = contains:"Tail line."\n'
-        "new_text = Tail line updated.\n",
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = Tail line.\n"
+        "format.underline = true\n",
         mode="best_effort",
     )
 
+    session_snapshot = output_dir / "session_workflow_page1.png"
+    snapshot_page(str(session_doc), str(session_snapshot), page=1)
+
     return {
         "session_workflow": session_doc,
-        "snapshot_before": snapshot_before,
-        "snapshot_after": snapshot_after,
-        "session_export": session_export,
         "patch_atomic": atomic_doc,
-        "patch_atomic_export": atomic_export,
         "patch_best_effort": best_effort_doc,
+        "session_snapshot": session_snapshot,
     }
 
 
 def test_session_workflow_document_state(tmp_path):
-    """Session workflow leaves visible text, tables, images, and metadata."""
+    """Session workflow leaves visible text, tables, images, formatting, and lists."""
     from writer import open_writer_session
-    from writer.metadata import get_metadata
 
     outputs = run_end_to_end_workflow(tmp_path)
 
     with open_writer_session(str(outputs["session_workflow"])) as session:
         text = session.read_text()
 
-    metadata = get_metadata(str(outputs["session_workflow"]))
-
-    assert "Inserted after intro." in text
-    assert "Updated body paragraph." in text
+    assert "Executive Summary\nInserted after summary.\n\nFinancial Summary" in text
+    assert "Quarterly revenue grew 21%." in text
     assert "Patched paragraph." in text
-    assert "Closing note added by patch." in text
     assert "Remove this sentence." not in text
     assert get_table_names(outputs["session_workflow"]) == ["Quarterly_Results"]
-    assert sorted(get_graphic_names(outputs["session_workflow"])) == [
-        "Logo",
-        "Patch Artifact",
-    ]
-    assert metadata["title"] == "Writer Session Workflow"
-    assert metadata["author"] == "Test Suite"
+    assert get_graphic_names(outputs["session_workflow"]) == ["Logo"]
+    assert_text_formatting(
+        outputs["session_workflow"],
+        "Quarterly revenue grew 21%.",
+        char_weight=150.0,
+        align=2,
+    )
+    assert_list_items(
+        outputs["session_workflow"],
+        ["Escalate blocker", "Collect approvals", "Patched checklist"],
+        expected_levels=[0, 1, 0],
+        expected_numbering_type=BULLET_NUMBERING_TYPE,
+    )
 
 
 def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_path):
@@ -214,14 +265,27 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
         best_effort_text = session.read_text()
 
     assert "Atomic addition." in atomic_text
-    assert "Executive Summary\nAtomic addition." in atomic_text
-    assert "Modern sentence." in atomic_text
-    assert "Legacy sentence." not in atomic_text
+    assert_text_formatting(
+        outputs["patch_atomic"],
+        "Quarterly revenue grew 18%.",
+        char_weight=150.0,
+    )
+    assert_list_items(
+        outputs["patch_atomic"],
+        ["Confirm scope", "Review output"],
+        expected_levels=[0, 1],
+        expected_numbering_type=ARABIC_NUMBERING_TYPE,
+    )
 
-    assert "Best effort addition." in best_effort_text
-    assert "Status Report\nBest effort addition." in best_effort_text
-    assert "Tail line updated." in best_effort_text
-    assert "Keep this sentence." in best_effort_text
+    assert "Best effort addition" in best_effort_text
+    assert "Tail line." in best_effort_text
+    assert_list_items(
+        outputs["patch_best_effort"],
+        ["Best effort addition"],
+        expected_levels=[0],
+        expected_numbering_type=BULLET_NUMBERING_TYPE,
+    )
+    assert_text_formatting(outputs["patch_best_effort"], "Tail line.", char_underline=1)
 
 
 def test_workflow_outputs_to_test_output_dir():
@@ -237,21 +301,13 @@ def test_workflow_outputs_to_test_output_dir():
 
     for key in (
         "session_workflow",
-        "snapshot_before",
-        "snapshot_after",
-        "session_export",
         "patch_atomic",
-        "patch_atomic_export",
         "patch_best_effort",
+        "session_snapshot",
     ):
         path = outputs[key]
         assert path.exists(), f"{key} not found at {path}"
         assert path.stat().st_size > 0, f"{key} is empty at {path}"
 
-    before_bytes = outputs["snapshot_before"].read_bytes()
-    after_bytes = outputs["snapshot_after"].read_bytes()
-    assert before_bytes != after_bytes, "Snapshots should differ after formatting"
-
-    for key in ("snapshot_before", "snapshot_after"):
-        with open(outputs[key], "rb") as handle:
-            assert handle.read(8) == b"\x89PNG\r\n\x1a\n"
+    with open(outputs["session_snapshot"], "rb") as handle:
+        assert handle.read(8) == b"\x89PNG\r\n\x1a\n"

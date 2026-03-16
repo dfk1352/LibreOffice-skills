@@ -7,24 +7,12 @@ class WriterSkillError(Exception):
     """Base error for Writer skill."""
 
 
-class WriterSessionError(SessionClosedError, WriterSkillError):
+class WriterSessionError(WriterSkillError):
     """Error for Writer session lifecycle misuse."""
 
 
 class DocumentNotFoundError(WriterSkillError):
     """Error when document file is not found."""
-
-
-class InvalidFormattingError(WriterSkillError):
-    """Error for invalid formatting parameters."""
-
-
-class InvalidTableError(WriterSkillError):
-    """Error for invalid table parameters."""
-
-
-class ImageNotFoundError(WriterSkillError):
-    """Error when image file is not found."""
 
 
 class InvalidMetadataError(WriterSkillError):
@@ -39,37 +27,58 @@ class PatchOperationError(WriterSkillError):
     """Base error for parsed Writer patch operations."""
 
 
-class InvalidSelectorError(PatchOperationError):
-    """Error for malformed or unsupported selectors."""
+class InvalidTargetError(PatchOperationError):
+    """Error for malformed or unsupported targets."""
 
 
-class SelectorNoMatchError(PatchOperationError):
-    """Error when a selector matches no document content."""
+class TargetNoMatchError(PatchOperationError):
+    """Error when a target matches no document content."""
 
 
-class SelectorAmbiguousError(PatchOperationError):
-    """Error when a selector matches more than one element."""
+class TargetAmbiguousError(PatchOperationError):
+    """Error when a target matches more than one element."""
+
+
+class InvalidFormattingError(PatchOperationError):
+    """Error for invalid formatting parameters."""
+
+
+class InvalidListError(PatchOperationError):
+    """Error for invalid list parameters."""
+
+
+class InvalidTableError(PatchOperationError):
+    """Error for invalid table parameters."""
+
+
+class ImageNotFoundError(PatchOperationError):
+    """Error when image file is not found."""
 
 
 class InvalidPayloadError(PatchOperationError):
     """Error when patch payload data is invalid for the target."""
 
 
-# Re-export for compatibility
+InvalidSelectorError = InvalidTargetError
+SelectorNoMatchError = TargetNoMatchError
+SelectorAmbiguousError = TargetAmbiguousError
+
+
 __all__ = [
     "WriterSkillError",
     "WriterSessionError",
     "UnoBridgeError",
     "SessionClosedError",
     "DocumentNotFoundError",
-    "InvalidFormattingError",
-    "InvalidTableError",
-    "ImageNotFoundError",
     "InvalidMetadataError",
     "PatchSyntaxError",
     "PatchOperationError",
-    "InvalidSelectorError",
-    "SelectorNoMatchError",
-    "SelectorAmbiguousError",
+    "InvalidTargetError",
+    "TargetNoMatchError",
+    "TargetAmbiguousError",
+    "InvalidFormattingError",
+    "InvalidListError",
+    "InvalidTableError",
+    "ImageNotFoundError",
     "InvalidPayloadError",
 ]

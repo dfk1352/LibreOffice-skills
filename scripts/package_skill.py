@@ -59,6 +59,8 @@ def _add_dir(zip_file: ZipFile, source: Path, archive_root: Path) -> None:
     for path in source.rglob("*"):
         if path.is_dir():
             continue
+        if "__pycache__" in path.parts or path.suffix == ".pyc":
+            continue
         rel = path.relative_to(source)
         zip_file.write(path, (archive_root / rel).as_posix())
 

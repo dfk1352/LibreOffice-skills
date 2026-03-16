@@ -13,44 +13,81 @@ def test_parse_patch_empty_string_returns_empty_operations():
     assert parse_patch("") == []
 
 
-def test_parse_patch_single_insert_text_block():
+def test_parse_patch_format_text_block_parses_structured_target_and_formatting():
     from writer.patch import parse_patch
 
     operations = parse_patch(
-        "[operation]\ntype = insert_text\ntext = Hello from patch\n"
+        "[operation]\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = quarterly revenue\n"
+        "target.after = Financial Summary\n"
+        "target.before = Risks\n"
+        "target.occurrence = 0\n"
+        "format.bold = true\n"
+        "format.color = navy\n"
     )
 
     assert len(operations) == 1
     operation = operations[0]
-    assert operation.operation_type == "insert_text"
-    assert operation.selector is None
-    assert operation.payload["text"] == "Hello from patch"
+    assert operation.operation_type == "format_text"
+    assert operation.target.kind == "text"
+    assert operation.target.text == "quarterly revenue"
+    assert operation.target.after == "Financial Summary"
+    assert operation.target.before == "Risks"
+    assert operation.target.occurrence == 0
+    assert operation.payload["formatting"].bold is True
+    assert operation.payload["formatting"].color == "navy"
 
 
-def test_parse_patch_multiple_blocks_preserve_order():
+def test_parse_patch_insert_list_block_parses_multiline_json_items():
     from writer.patch import parse_patch
 
     operations = parse_patch(
         "[operation]\n"
-        "type = insert_text\n"
-        "text = First\n\n"
-        "[operation]\n"
-        "type = delete_table\n"
-        'selector = name:"Quarterly Results"\n'
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.after = Action Items\n"
+        "list.ordered = false\n"
+        "items <<JSON\n"
+        "[\n"
+        '  {"text": "Confirm scope", "level": 0},\n'
+        '  {"text": "Review output", "level": 0},\n'
+        '  {"text": "Update packaging", "level": 1}\n'
+        "]\n"
+        "JSON\n"
     )
 
-    assert [operation.operation_type for operation in operations] == [
-        "insert_text",
-        "delete_table",
+    assert len(operations) == 1
+    operation = operations[0]
+    assert operation.operation_type == "insert_list"
+    assert operation.target.kind == "insertion"
+    assert operation.target.after == "Action Items"
+    assert operation.payload["ordered"] is False
+    assert [(item.text, item.level) for item in operation.payload["items"]] == [
+        ("Confirm scope", 0),
+        ("Review output", 0),
+        ("Update packaging", 1),
     ]
 
 
-def test_parse_patch_missing_required_key_raises_patch_syntax_error():
-    from writer.exceptions import PatchSyntaxError
+def test_parse_patch_replace_text_supports_multiline_new_text():
     from writer.patch import parse_patch
 
-    with pytest.raises(PatchSyntaxError):
-        parse_patch('[operation]\ntype = replace_text\nselector = contains:"old"\n')
+    operations = parse_patch(
+        "[operation]\n"
+        "type = replace_text\n"
+        "target.kind = text\n"
+        "target.text = old paragraph\n"
+        "new_text <<TEXT\n"
+        "Updated line one.\n"
+        "Updated line two.\n"
+        "TEXT\n"
+    )
+
+    assert operations[0].operation_type == "replace_text"
+    assert operations[0].target.text == "old paragraph"
+    assert operations[0].payload["new_text"] == "Updated line one.\nUpdated line two."
 
 
 def test_parse_patch_unknown_operation_type_raises_patch_syntax_error():
@@ -61,46 +98,63 @@ def test_parse_patch_unknown_operation_type_raises_patch_syntax_error():
         parse_patch("[operation]\ntype = explode_document\ntext = nope\n")
 
 
-def test_parse_patch_ignores_comments_and_blank_lines():
-    from writer.patch import parse_patch
-
-    operations = parse_patch(
-        "# comment before block\n\n"
-        "[operation]\n"
-        "type = insert_text\n"
-        "text = First\n\n"
-        "# another comment\n"
-        "[operation]\n"
-        "type = delete_text\n"
-        'selector = contains:"First"\n'
-    )
-
-    assert len(operations) == 2
-    assert operations[0].operation_type == "insert_text"
-    assert operations[1].operation_type == "delete_text"
-
-
-def test_parse_patch_parses_table_data_json():
-    from writer.patch import parse_patch
-
-    operations = parse_patch(
-        "[operation]\n"
-        "type = update_table\n"
-        'selector = name:"Budget Table"\n'
-        'data = [["A", "B"], ["1", "2"]]\n'
-    )
-
-    assert operations[0].payload["data"] == [["A", "B"], ["1", "2"]]
-
-
-def test_parse_patch_malformed_table_data_json_raises_patch_syntax_error():
+def test_parse_patch_unterminated_heredoc_raises_patch_syntax_error():
     from writer.exceptions import PatchSyntaxError
     from writer.patch import parse_patch
 
     with pytest.raises(PatchSyntaxError):
         parse_patch(
             "[operation]\n"
-            "type = update_table\n"
-            'selector = name:"Budget Table"\n'
-            'data = [["A", "B"]\n'
+            "type = replace_text\n"
+            "target.kind = text\n"
+            "target.text = old\n"
+            "new_text <<TEXT\n"
+            "unfinished payload\n"
+        )
+
+
+def test_parse_patch_bad_target_occurrence_integer_raises_patch_syntax_error():
+    from writer.exceptions import PatchSyntaxError
+    from writer.patch import parse_patch
+
+    with pytest.raises(PatchSyntaxError):
+        parse_patch(
+            "[operation]\n"
+            "type = delete_text\n"
+            "target.kind = text\n"
+            "target.text = old\n"
+            "target.occurrence = first\n"
+        )
+
+
+@pytest.mark.parametrize("key", ["items", "data"])
+def test_parse_patch_invalid_json_payload_raises_patch_syntax_error(key):
+    from writer.exceptions import PatchSyntaxError
+    from writer.patch import parse_patch
+
+    payload_block = (
+        "[operation]\n"
+        f"type = {'insert_list' if key == 'items' else 'update_table'}\n"
+        "target.kind = text\n"
+        "target.text = anchor\n"
+    )
+    if key == "items":
+        payload_block += "list.ordered = false\nitems = [invalid\n"
+    else:
+        payload_block += 'data = [["A", "B"]\n'
+
+    with pytest.raises(PatchSyntaxError):
+        parse_patch(payload_block)
+
+
+def test_parse_patch_rejects_old_selector_syntax():
+    from writer.exceptions import PatchSyntaxError
+    from writer.patch import parse_patch
+
+    with pytest.raises(PatchSyntaxError):
+        parse_patch(
+            "[operation]\n"
+            "type = replace_text\n"
+            'selector = contains:"old phrase"\n'
+            "new_text = replacement\n"
         )

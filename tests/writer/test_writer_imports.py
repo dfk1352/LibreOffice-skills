@@ -17,5 +17,8 @@ def test_imports_writer_package():
     assert hasattr(writer, "patch")
     assert callable(writer.patch)
     assert hasattr(writer, "WriterSession")
+    assert hasattr(writer, "WriterTarget")
+    assert hasattr(writer, "TextFormatting")
+    assert hasattr(writer, "ListItem")
     assert hasattr(writer, "PatchApplyResult")
     assert hasattr(writer, "PatchOperationResult")

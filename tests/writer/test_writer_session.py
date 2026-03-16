@@ -72,13 +72,20 @@ def test_session_close_save_false_discards_changes(tmp_path):
         (
             "replace_text",
             lambda session, image_path: session.replace_text(
-                'contains:"seed"',
+                _text_target(),
                 "updated",
             ),
         ),
         (
             "delete_text",
-            lambda session, image_path: session.delete_text('contains:"seed"'),
+            lambda session, image_path: session.delete_text(_text_target()),
+        ),
+        (
+            "format_text",
+            lambda session, image_path: session.format_text(
+                _text_target(),
+                _formatting(),
+            ),
         ),
         (
             "insert_table",
@@ -86,11 +93,11 @@ def test_session_close_save_false_discards_changes(tmp_path):
         ),
         (
             "update_table",
-            lambda session, image_path: session.update_table('name:"T1"', [["x"]]),
+            lambda session, image_path: session.update_table(_table_target(), [["x"]]),
         ),
         (
             "delete_table",
-            lambda session, image_path: session.delete_table('name:"T1"'),
+            lambda session, image_path: session.delete_table(_table_target()),
         ),
         (
             "insert_image",
@@ -101,13 +108,31 @@ def test_session_close_save_false_discards_changes(tmp_path):
         (
             "update_image",
             lambda session, image_path: session.update_image(
-                'name:"Logo"',
+                _image_target(),
                 image_path=str(image_path),
             ),
         ),
         (
             "delete_image",
-            lambda session, image_path: session.delete_image('name:"Logo"'),
+            lambda session, image_path: session.delete_image(_image_target()),
+        ),
+        (
+            "insert_list",
+            lambda session, image_path: session.insert_list(
+                _list_items(), ordered=False
+            ),
+        ),
+        (
+            "replace_list",
+            lambda session, image_path: session.replace_list(
+                _list_target(),
+                _list_items(),
+                ordered=True,
+            ),
+        ),
+        (
+            "delete_list",
+            lambda session, image_path: session.delete_list(_list_target()),
         ),
         (
             "patch",
@@ -193,3 +218,39 @@ def test_open_writer_session_context_manager_closes_on_exception(tmp_path):
     assert session is not None
     with pytest.raises(WriterSessionError):
         session.read_text()
+
+
+def _text_target():
+    from writer import WriterTarget
+
+    return WriterTarget(kind="text", text="seed")
+
+
+def _table_target():
+    from writer import WriterTarget
+
+    return WriterTarget(kind="table", name="T1")
+
+
+def _image_target():
+    from writer import WriterTarget
+
+    return WriterTarget(kind="image", name="Logo")
+
+
+def _list_target():
+    from writer import WriterTarget
+
+    return WriterTarget(kind="list", text="seed")
+
+
+def _formatting():
+    from writer import TextFormatting
+
+    return TextFormatting(bold=True)
+
+
+def _list_items():
+    from writer import ListItem
+
+    return [ListItem(text="seed", level=0)]
