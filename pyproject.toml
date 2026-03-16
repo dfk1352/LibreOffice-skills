@@ -18,6 +18,9 @@ dev = [
     "pillow~=12.1",
 ]
 
+[tool.uv]
+default-groups = ["dev"]
+
 [tool.mypy]
 python_version = "3.12"
 

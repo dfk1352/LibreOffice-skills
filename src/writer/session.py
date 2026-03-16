@@ -12,7 +12,6 @@ from writer.core import EXPORT_FILTERS
 from writer.exceptions import (
     DocumentNotFoundError,
     ImageNotFoundError,
-    InvalidPayloadError,
     WriterSessionError,
     WriterSkillError,
 )

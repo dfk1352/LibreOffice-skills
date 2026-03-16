@@ -7,7 +7,6 @@ from typing import Any
 
 from colors import resolve_color
 from writer.exceptions import (
-    ImageNotFoundError,
     InvalidFormattingError,
     InvalidListError,
     InvalidPayloadError,
