@@ -145,16 +145,3 @@ def test_parse_patch_invalid_json_payload_raises_patch_syntax_error(key):
 
     with pytest.raises(PatchSyntaxError):
         parse_patch(payload_block)
-
-
-def test_parse_patch_rejects_old_selector_syntax():
-    from writer.exceptions import PatchSyntaxError
-    from writer.patch import parse_patch
-
-    with pytest.raises(PatchSyntaxError):
-        parse_patch(
-            "[operation]\n"
-            "type = replace_text\n"
-            'selector = contains:"old phrase"\n'
-            "new_text = replacement\n"
-        )

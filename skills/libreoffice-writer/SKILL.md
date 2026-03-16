@@ -45,9 +45,7 @@ WriterSession methods:
 patch(path, patch_text, mode="atomic") -> PatchApplyResult
 ```
 
-## Structured Targets
-
-Use `WriterTarget` instead of selector strings.
+## Structured Targets: `WriterTarget`
 
 ```python
 from writer import WriterTarget
@@ -170,7 +168,6 @@ JSON
 - Use `list.ordered` plus JSON `items` for list operations.
 - `items` and `data` must be valid JSON.
 - Heredoc blocks are supported with `<<TAG ... TAG` for multiline text or JSON.
-- Legacy `selector = ...` syntax is not supported.
 
 ### Modes
 

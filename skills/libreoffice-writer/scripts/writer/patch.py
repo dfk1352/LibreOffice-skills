@@ -72,8 +72,6 @@ def parse_patch(patch_text: str) -> list[PatchOperation]:
             raise PatchSyntaxError("Operation block is missing type")
         if operation_type not in _OPERATION_TYPES:
             raise PatchSyntaxError(f"Unknown operation type: {operation_type}")
-        if "selector" in block:
-            raise PatchSyntaxError("selector syntax is no longer supported")
 
         target_fields = {
             key.split(".", 1)[1]: _coerce_target_value(key.split(".", 1)[1], value)

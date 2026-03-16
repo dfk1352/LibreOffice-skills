@@ -59,11 +59,6 @@ class InvalidPayloadError(PatchOperationError):
     """Error when patch payload data is invalid for the target."""
 
 
-InvalidSelectorError = InvalidTargetError
-SelectorNoMatchError = TargetNoMatchError
-SelectorAmbiguousError = TargetAmbiguousError
-
-
 __all__ = [
     "WriterSkillError",
     "WriterSessionError",
