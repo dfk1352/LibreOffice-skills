@@ -9,6 +9,7 @@ description: Use when creating, editing, formatting, or extracting LibreOffice I
 Use the `impress` modules to create and edit Impress
 presentations with UNO-backed operations. Prefer these high-level functions
 instead of raw UNO calls or a CLI.
+If setup or runtime issues appear, check `references/troubleshooting.md`.
 
 ## Quick Reference
 - `core.create_presentation(path)`

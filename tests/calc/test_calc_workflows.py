@@ -1,181 +1,468 @@
-"""Integration tests for Calc workflows."""
+"""Integration workflow tests for Calc session-first workflows."""
 
-# pyright: reportMissingImports=false
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
+from __future__ import annotations
 
 from pathlib import Path
 
+from tests.calc._helpers import (
+    get_cell_number_format,
+    get_chart_details,
+    get_validation_properties,
+    list_chart_names,
+    named_range_exists,
+)
+
 
 def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
-    """Build a Calc spreadsheet exercising every tool, then snapshot before/after.
-
-    This is the single function that produces all inspectable output files.
-    It exercises: create_spreadsheet, add/rename/remove/list_sheets,
-    set/get_cell, set/get_range, define_named_range, recalculate,
-    apply_format, add_validation, create_chart, export_spreadsheet,
-    and snapshot_area.
-
-    Args:
-        output_dir: Directory where all output files are written.
-
-    Returns:
-        Dict mapping logical names to output file paths:
-            "spreadsheet"     -> workflow.ods
-            "pdf"             -> workflow.pdf
-            "snapshot_before" -> calc_snapshot_before.png
-            "snapshot_after"  -> calc_snapshot_after.png
-    """
-    from calc.charts import create_chart
-    from calc.cells import get_cell, set_cell
-    from calc.core import create_spreadsheet, export_spreadsheet
-    from calc.formatting import apply_format
-    from calc.named_ranges import define_named_range
-    from calc.ranges import get_range, set_range
-    from calc.recalc import recalculate
-    from calc.sheets import (
-        add_sheet,
-        list_sheets,
-        remove_sheet,
-        rename_sheet,
+    """Build Calc workflow artifacts that exercise every public Calc tool."""
+    from calc import (
+        CalcTarget,
+        CellFormatting,
+        ChartSpec,
+        ValidationRule,
+        open_calc_session,
+        patch,
+        snapshot_area,
     )
-    from calc.snapshot import snapshot_area
-    from calc.validation import add_validation
+    from calc.core import create_spreadsheet
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- Build the spreadsheet ---
-    path = output_dir / "workflow.ods"
-    create_spreadsheet(str(path))
-    add_sheet(str(path), "Data")
-    rename_sheet(str(path), "Data", "DataFinal")
-    sheets = [sheet["name"] for sheet in list_sheets(str(path))]
-    assert "DataFinal" in sheets
+    session_doc = output_dir / "session_workflow.ods"
+    create_spreadsheet(str(session_doc))
 
-    set_range(
-        str(path),
-        "DataFinal",
-        0,
-        0,
-        [["Label", "Value"], ["Revenue", 100], ["Revenue", 200]],
+    session = open_calc_session(str(session_doc))
+    session.write_cell(
+        CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+        "Workflow Seed",
+        value_type="text",
     )
-    apply_format(str(path), "DataFinal", 1, 1, {"number_format": "currency"})
-    apply_format(str(path), "DataFinal", 2, 1, {"number_format": "currency"})
+    assert (
+        session.read_cell(CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0))[
+            "value"
+        ]
+        == "Workflow Seed"
+    )
 
-    define_named_range(str(path), "RevenueValues", "DataFinal", 1, 1, 2, 1)
-    set_cell(str(path), "DataFinal", 3, 1, "=SUM(RevenueValues)", type="formula")
-    recalculate(str(path))
-    total = get_cell(str(path), "DataFinal", 3, 1)
-    assert total["value"] == 300
+    session.rename_sheet(CalcTarget(kind="sheet", sheet="Sheet1"), "Revenue Data")
+    session.add_sheet("Summary")
+    session.add_sheet("Scratch")
+    assert [sheet["name"] for sheet in session.list_sheets()] == [
+        "Revenue Data",
+        "Summary",
+        "Scratch",
+    ]
 
-    add_validation(
-        str(path),
-        "DataFinal",
+    summary_range = CalcTarget(
+        kind="range",
+        sheet="Summary",
+        row=0,
+        col=0,
+        end_row=2,
+        end_col=1,
+    )
+    session.write_range(
+        summary_range,
+        [["Metric", "Value"], ["Status", "Draft"], ["Scope", "Session workflow"]],
+    )
+
+    data_range = CalcTarget(
+        kind="range",
+        sheet="Revenue Data",
+        row=0,
+        col=0,
+        end_row=2,
+        end_col=1,
+    )
+    session.write_range(
+        data_range,
+        [["Label", "Value"], ["Revenue", 100], ["Cost", 80]],
+    )
+    assert session.read_range(data_range)[1][1]["value"] == 100
+
+    currency_target = CalcTarget(
+        kind="range",
+        sheet="Revenue Data",
+        row=1,
+        col=1,
+        end_row=2,
+        end_col=1,
+    )
+    session.format_range(
+        currency_target, CellFormatting(number_format="currency", bold=True)
+    )
+
+    retained_range = CalcTarget(
+        kind="range",
+        sheet="Revenue Data",
+        row=1,
+        col=1,
+        end_row=2,
+        end_col=1,
+    )
+    session.define_named_range("RevenueValues", retained_range)
+    assert (
+        session.get_named_range(CalcTarget(kind="named_range", name="RevenueValues"))[
+            "name"
+        ]
+        == "RevenueValues"
+    )
+
+    temporary_range = CalcTarget(
+        kind="range",
+        sheet="Revenue Data",
+        row=1,
+        col=0,
+        end_row=2,
+        end_col=0,
+    )
+    session.define_named_range("TemporaryLabels", temporary_range)
+    session.delete_named_range(CalcTarget(kind="named_range", name="TemporaryLabels"))
+
+    session.set_validation(
+        currency_target,
+        ValidationRule(
+            type="whole",
+            condition="between",
+            value1=1,
+            value2=1000,
+            show_error=True,
+            error_message="Revenue must stay within 1-1000",
+        ),
+    )
+    session.set_validation(
+        temporary_range,
+        ValidationRule(type="text_length", condition="greater_than", value1=3),
+    )
+    session.clear_validation(temporary_range)
+
+    total_target = CalcTarget(kind="cell", sheet="Revenue Data", row=4, col=1)
+    session.write_cell(total_target, "=SUM(RevenueValues)", value_type="formula")
+    session.recalculate()
+    assert session.read_cell(total_target)["value"] == 180
+
+    session.create_chart(
+        CalcTarget(kind="sheet", sheet="Revenue Data"),
+        ChartSpec(
+            chart_type="line",
+            data_range=data_range,
+            anchor_row=5,
+            anchor_col=0,
+            width=5000,
+            height=3000,
+            title="Revenue Trend",
+        ),
+    )
+    session.create_chart(
+        CalcTarget(kind="sheet", sheet="Summary"),
+        ChartSpec(
+            chart_type="line",
+            data_range=summary_range,
+            anchor_row=4,
+            anchor_col=0,
+            width=3500,
+            height=2000,
+            title="Temporary Summary Chart",
+        ),
+    )
+    session.close()
+
+    snapshot_before = output_dir / "calc_snapshot_before.png"
+    snapshot_area(
+        str(session_doc),
+        str(snapshot_before),
+        sheet="Revenue Data",
+        row=0,
+        col=0,
+        width=900,
+        height=500,
+    )
+
+    session = open_calc_session(str(session_doc))
+    session.write_range(
+        CalcTarget(
+            kind="range",
+            sheet="Revenue Data",
+            row=0,
+            col=0,
+            end_row=3,
+            end_col=1,
+        ),
+        [["Label", "Value"], ["Revenue", 100], ["Cost", 80], ["Profit", 20]],
+    )
+    session.update_chart(
+        CalcTarget(kind="chart", sheet="Revenue Data", index=0),
+        ChartSpec(
+            chart_type="bar",
+            data_range=CalcTarget(
+                kind="range",
+                sheet="Revenue Data",
+                row=0,
+                col=0,
+                end_row=3,
+                end_col=1,
+            ),
+            anchor_row=7,
+            anchor_col=2,
+            width=6000,
+            height=3500,
+            title="Revenue Trend Updated",
+        ),
+    )
+    session.write_cell(
+        CalcTarget(kind="cell", sheet="Summary", row=1, col=1),
+        "Ready for review",
+        value_type="text",
+    )
+    session.write_cell(
+        CalcTarget(kind="cell", sheet="Summary", row=3, col=0),
+        "Updated chart retained on Revenue Data",
+        value_type="text",
+    )
+    session.close()
+
+    with open_calc_session(str(session_doc)) as session:
+        session.format_range(
+            CalcTarget(
+                kind="range", sheet="Revenue Data", row=0, col=0, end_row=0, end_col=1
+            ),
+            CellFormatting(bold=True, font_size=14),
+        )
+        session.format_range(
+            CalcTarget(
+                kind="range", sheet="Revenue Data", row=1, col=0, end_row=3, end_col=0
+            ),
+            CellFormatting(italic=True, font_size=13),
+        )
+        patch_result = session.patch(
+            "[operation]\n"
+            "type = write_cell\n"
+            "target.kind = cell\n"
+            "target.sheet = Revenue Data\n"
+            "target.row = 0\n"
+            "target.col = 0\n"
+            "value = Category\n"
+            "value_type = text\n"
+            "[operation]\n"
+            "type = write_cell\n"
+            "target.kind = cell\n"
+            "target.sheet = Revenue Data\n"
+            "target.row = 5\n"
+            "target.col = 0\n"
+            "value = Patched note\n"
+            "value_type = text\n"
+            "[operation]\n"
+            "type = format_range\n"
+            "target.kind = range\n"
+            "target.sheet = Revenue Data\n"
+            "target.row = 0\n"
+            "target.col = 0\n"
+            "target.end_row = 0\n"
+            "target.end_col = 1\n"
+            "format.bold = true\n"
+            "format.font_size = 14\n",
+            mode="atomic",
+        )
+        assert patch_result.overall_status == "ok"
+        session.delete_chart(CalcTarget(kind="chart", sheet="Summary", index=0))
+        session.delete_sheet(CalcTarget(kind="sheet", sheet="Scratch"))
+        workflow_pdf = output_dir / "workflow.pdf"
+        session.export(str(workflow_pdf), "pdf")
+
+    snapshot_after = output_dir / "calc_snapshot_after.png"
+    snapshot_area(
+        str(session_doc),
+        str(snapshot_after),
+        sheet="Revenue Data",
+        row=0,
+        col=0,
+        width=900,
+        height=500,
+    )
+
+    atomic_doc = output_dir / "patch_atomic.ods"
+    create_spreadsheet(str(atomic_doc))
+    with open_calc_session(str(atomic_doc)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            "Atomic baseline",
+            value_type="text",
+        )
+
+    patch(
+        str(atomic_doc),
+        "[operation]\n"
+        "type = write_cell\n"
+        "target.kind = cell\n"
+        "target.sheet = Sheet1\n"
+        "target.row = 0\n"
+        "target.col = 0\n"
+        "value = rolled back\n"
+        "value_type = text\n"
+        "[operation]\n"
+        "type = delete_chart\n"
+        "target.kind = chart\n"
+        "target.sheet = Sheet1\n"
+        "target.name = MissingChart\n"
+        "[operation]\n"
+        "type = write_cell\n"
+        "target.kind = cell\n"
+        "target.sheet = Sheet1\n"
+        "target.row = 1\n"
+        "target.col = 0\n"
+        "value = skipped later\n"
+        "value_type = text\n",
+        mode="atomic",
+    )
+
+    best_effort_doc = output_dir / "patch_best_effort.ods"
+    create_spreadsheet(str(best_effort_doc))
+    with open_calc_session(str(best_effort_doc)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            "Best effort baseline",
+            value_type="text",
+        )
+
+    patch(
+        str(best_effort_doc),
+        "[operation]\n"
+        "type = write_cell\n"
+        "target.kind = cell\n"
+        "target.sheet = Sheet1\n"
+        "target.row = 1\n"
+        "target.col = 0\n"
+        "value = preserved first\n"
+        "value_type = text\n"
+        "[operation]\n"
+        "type = delete_named_range\n"
+        "target.kind = named_range\n"
+        "target.name = MissingRange\n"
+        "[operation]\n"
+        "type = write_cell\n"
+        "target.kind = cell\n"
+        "target.sheet = Sheet1\n"
+        "target.row = 2\n"
+        "target.col = 0\n"
+        "value = preserved later\n"
+        "value_type = text\n",
+        mode="best_effort",
+    )
+
+    return {
+        "session_workflow": session_doc,
+        "patch_atomic": atomic_doc,
+        "patch_best_effort": best_effort_doc,
+        "workflow_pdf": workflow_pdf,
+        "snapshot_before": snapshot_before,
+        "snapshot_after": snapshot_after,
+    }
+
+
+def test_session_workflow_document_state(tmp_path):
+    """Session workflow leaves visible session-first Calc state behind."""
+    from calc import CalcTarget, open_calc_session
+
+    outputs = run_calc_end_to_end_workflow(tmp_path)
+
+    with open_calc_session(str(outputs["session_workflow"])) as session:
+        sheets = session.list_sheets()
+        total = session.read_cell(
+            CalcTarget(kind="cell", sheet="Revenue Data", row=4, col=1)
+        )
+        patched_note = session.read_cell(
+            CalcTarget(kind="cell", sheet="Revenue Data", row=5, col=0)
+        )
+        patched_header = session.read_cell(
+            CalcTarget(kind="cell", sheet="Revenue Data", row=0, col=0)
+        )
+        summary_status = session.read_cell(
+            CalcTarget(kind="cell", sheet="Summary", row=1, col=1)
+        )
+
+    assert [sheet["name"] for sheet in sheets] == ["Revenue Data", "Summary"]
+    assert total["value"] == 180
+    assert patched_note["value"] == "Patched note"
+    assert patched_header["value"] == "Category"
+    assert summary_status["value"] == "Ready for review"
+    assert named_range_exists(outputs["session_workflow"], "RevenueValues")
+    assert not named_range_exists(outputs["session_workflow"], "TemporaryLabels")
+    assert get_cell_number_format(
+        outputs["session_workflow"], "Revenue Data", 1, 1
+    ) == get_cell_number_format(
+        outputs["session_workflow"],
+        "Revenue Data",
+        2,
+        1,
+    )
+    validation = get_validation_properties(
+        outputs["session_workflow"],
+        "Revenue Data",
         1,
         1,
         2,
         1,
-        {
-            "type": "whole",
-            "condition": "between",
-            "value1": 1,
-            "value2": 1000,
-            "show_error": True,
-            "error_message": "Value must be 1-1000",
-        },
     )
-
-    create_chart(
-        str(path),
-        "DataFinal",
-        (0, 0, 2, 1),
-        "line",
-        anchor=(5, 0),
-        size=(5000, 3000),
-        title="Revenue Trend",
+    assert validation["type"] == "WHOLE"
+    cleared_validation = get_validation_properties(
+        outputs["session_workflow"],
+        "Revenue Data",
+        1,
+        0,
+        2,
+        0,
     )
-
-    range_results = get_range(str(path), "DataFinal", 1, 1, 2, 1)
-    assert range_results[0][0]["value"] == 100
-    assert range_results[1][0]["value"] == 200
-
-    add_sheet(str(path), "Scratch")
-    remove_sheet(str(path), "Scratch")
-
-    export_spreadsheet(str(path), str(output_dir / "workflow.pdf"), "pdf")
-
-    # --- Snapshot BEFORE formatting changes ---
-    before_path = output_dir / "calc_snapshot_before.png"
-    snapshot_area(str(path), str(before_path), sheet="DataFinal")
-
-    # --- Apply visible formatting changes ---
-    apply_format(str(path), "DataFinal", 0, 0, {"bold": True, "font_size": 16})
-    apply_format(str(path), "DataFinal", 0, 1, {"bold": True, "font_size": 16})
-    apply_format(str(path), "DataFinal", 1, 0, {"italic": True, "font_size": 14})
-    apply_format(str(path), "DataFinal", 2, 0, {"italic": True, "font_size": 14})
-    apply_format(str(path), "DataFinal", 1, 1, {"font_size": 14})
-    apply_format(str(path), "DataFinal", 2, 1, {"font_size": 14})
-    set_range(str(path), "DataFinal", 4, 0, [["TOTAL (formatted)"]])
-    apply_format(str(path), "DataFinal", 4, 0, {"bold": True, "font_size": 14})
-
-    # --- Snapshot AFTER formatting changes ---
-    after_path = output_dir / "calc_snapshot_after.png"
-    snapshot_area(str(path), str(after_path), sheet="DataFinal")
-
-    return {
-        "spreadsheet": path,
-        "pdf": output_dir / "workflow.pdf",
-        "snapshot_before": before_path,
-        "snapshot_after": after_path,
+    assert cleared_validation["type"] == "ANY"
+    assert list_chart_names(outputs["session_workflow"], "Revenue Data") == [
+        "Revenue Trend"
+    ]
+    assert list_chart_names(outputs["session_workflow"], "Summary") == []
+    chart = get_chart_details(outputs["session_workflow"], "Revenue Data", index=0)
+    assert chart["title"] == "Revenue Trend Updated"
+    assert chart["range"] == {
+        "start_row": 0,
+        "start_col": 0,
+        "end_row": 3,
+        "end_col": 1,
     }
+    assert chart["width"] >= 6000
+    assert chart["height"] >= 3500
 
 
-# ---------------------------------------------------------------------------
-# Deterministic assertion tests
-# ---------------------------------------------------------------------------
-
-
-def test_calc_snapshot_in_workflow(tmp_path):
-    """Assert snapshot_area produces a valid PNG for a Calc document."""
-    from calc.snapshot import snapshot_area
+def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_path):
+    """Standalone patch workflow preserves atomic and best-effort semantics."""
+    from calc import CalcTarget, open_calc_session
 
     outputs = run_calc_end_to_end_workflow(tmp_path)
-    # The workflow already produces snapshots; verify the before snapshot
-    snapshot_path = outputs["snapshot_before"]
 
-    assert snapshot_path.exists()
-    assert snapshot_path.stat().st_size > 0
+    with open_calc_session(str(outputs["patch_atomic"])) as session:
+        atomic_baseline = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
+        )
+        atomic_skipped = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
+        )
 
-    # Verify PNG magic bytes
-    with open(snapshot_path, "rb") as f:
-        assert f.read(8) == b"\x89PNG\r\n\x1a\n"
+    with open_calc_session(str(outputs["patch_best_effort"])) as session:
+        best_effort_first = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
+        )
+        best_effort_later = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=2, col=0)
+        )
 
-    # Also verify we can take an independent snapshot
-    independent_path = tmp_path / "independent_snapshot.png"
-    result = snapshot_area(
-        str(outputs["spreadsheet"]), str(independent_path), sheet="DataFinal"
-    )
-    assert independent_path.exists()
-    assert result.width > 0
-    assert result.height > 0
-    assert result.dpi == 150
+    assert atomic_baseline["value"] == "Atomic baseline"
+    assert atomic_skipped["value"] == 0.0
+    assert best_effort_first["value"] == "preserved first"
+    assert best_effort_later["value"] == "preserved later"
 
 
-def test_calc_workflow_outputs_to_test_output_dir():
-    """Produce inspectable output files in test-output/calc/.
-
-    Calls run_calc_end_to_end_workflow which builds a Calc spreadsheet
-    with data, formulas, chart, and validation, snapshots it before and
-    after formatting changes. Assertions verify that all output files
-    exist and the snapshots differ.
-
-    Output files:
-        test-output/calc/workflow.ods              - the spreadsheet
-        test-output/calc/workflow.pdf              - PDF export
-        test-output/calc/calc_snapshot_before.png  - before formatting changes
-        test-output/calc/calc_snapshot_after.png   - after formatting changes
-    """
+def test_workflow_outputs_to_test_output_dir():
+    """Produce inspectable Calc workflow files in test-output/calc/."""
     output_dir = Path("test-output/calc")
 
-    # Clean up previous runs
     if output_dir.exists():
         import shutil
 
@@ -183,18 +470,25 @@ def test_calc_workflow_outputs_to_test_output_dir():
 
     outputs = run_calc_end_to_end_workflow(output_dir)
 
-    # Assert all output files exist and are non-empty
-    for key in ("spreadsheet", "pdf", "snapshot_before", "snapshot_after"):
+    for key in (
+        "session_workflow",
+        "patch_atomic",
+        "patch_best_effort",
+        "workflow_pdf",
+        "snapshot_before",
+        "snapshot_after",
+    ):
         path = outputs[key]
         assert path.exists(), f"{key} not found at {path}"
         assert path.stat().st_size > 0, f"{key} is empty at {path}"
 
-    # Assert before and after snapshots differ (formatting changes are visible)
+    with open(outputs["workflow_pdf"], "rb") as handle:
+        assert handle.read(5) == b"%PDF-"
+
     before_bytes = outputs["snapshot_before"].read_bytes()
     after_bytes = outputs["snapshot_after"].read_bytes()
-    assert before_bytes != after_bytes, "Snapshots should differ after formatting"
+    assert before_bytes != after_bytes
 
-    # Assert PNG magic bytes on both snapshots
     for key in ("snapshot_before", "snapshot_after"):
-        with open(outputs[key], "rb") as f:
-            assert f.read(8) == b"\x89PNG\r\n\x1a\n"
+        with open(outputs[key], "rb") as handle:
+            assert handle.read(8) == b"\x89PNG\r\n\x1a\n"

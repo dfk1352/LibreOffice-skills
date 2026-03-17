@@ -1,5 +1,7 @@
 """Calc snapshot module for area-level PNG export."""
 
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -104,6 +106,8 @@ def snapshot_area(
                 )
 
             sheet_obj = sheets.getByName(sheet)
+            controller = doc.getCurrentController()
+            controller.setActiveSheet(sheet_obj)
 
             # Build cell range for Selection property
             # Determine the range to export based on row/col anchor
@@ -122,6 +126,7 @@ def snapshot_area(
                 cell_range = sheet_obj.getCellRangeByPosition(
                     col, row, max(col + 10, col), max(row + 20, row)
                 )
+            controller.select(cell_range)
 
             # Build FilterData properties
             pixel_w = width if width is not None else int(dpi * 8.27)

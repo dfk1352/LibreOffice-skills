@@ -1,5 +1,7 @@
 """Tests for Calc snapshot (area-level PNG export)."""
 
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
 import pytest
 
 
@@ -101,14 +103,23 @@ def test_snapshot_area_missing_doc_raises(tmp_path):
 
 def test_snapshot_area_creates_png(tmp_path):
     """snapshot_area creates a valid PNG file with non-zero size."""
+    from calc import CalcTarget, open_calc_session
     from calc.core import create_spreadsheet
-    from calc.cells import set_cell
     from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
-    set_cell(str(doc_path), "Sheet1", 0, 0, "Hello", type="text")
-    set_cell(str(doc_path), "Sheet1", 1, 0, 42, type="number")
+    with open_calc_session(str(doc_path)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            "Hello",
+            value_type="text",
+        )
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0),
+            42,
+            value_type="number",
+        )
 
     out_path = tmp_path / "snapshot.png"
     result = snapshot_area(str(doc_path), str(out_path))
@@ -159,13 +170,18 @@ def test_snapshot_area_custom_dpi(tmp_path):
 
 def test_snapshot_area_with_cell_anchor(tmp_path):
     """snapshot_area with row/col captures from the specified cell position."""
+    from calc import CalcTarget, open_calc_session
     from calc.core import create_spreadsheet
-    from calc.cells import set_cell
     from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
-    set_cell(str(doc_path), "Sheet1", 5, 3, "Anchored", type="text")
+    with open_calc_session(str(doc_path)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=5, col=3),
+            "Anchored",
+            value_type="text",
+        )
 
     out_path = tmp_path / "anchored.png"
     result = snapshot_area(str(doc_path), str(out_path), row=5, col=3)
