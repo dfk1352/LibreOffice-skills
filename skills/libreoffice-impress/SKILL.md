@@ -308,30 +308,30 @@ from impress import patch
 result = patch(
     "/abs/path/demo.odp",
     """
-[operation]
-type = replace_text
-target.kind = text
-target.slide_index = 1
-target.placeholder = body
-new_text = Quarterly revenue rose 21%.
+    [operation]
+    type = replace_text
+    target.kind = text
+    target.slide_index = 1
+    target.placeholder = body
+    new_text = Quarterly revenue rose 21%.
 
-[operation]
-type = insert_media
-target.kind = slide
-target.slide_index = 1
-media_path = /abs/path/demo.wav
-placement.x_cm = 1.0
-placement.y_cm = 9.0
-placement.width_cm = 5.0
-placement.height_cm = 3.0
-name = Demo Media
+    [operation]
+    type = insert_media
+    target.kind = slide
+    target.slide_index = 1
+    media_path = /abs/path/demo.wav
+    placement.x_cm = 1.0
+    placement.y_cm = 9.0
+    placement.width_cm = 5.0
+    placement.height_cm = 3.0
+    name = Demo Media
 
-[operation]
-type = delete_item
-target.kind = media
-target.slide_index = 1
-target.shape_name = Demo Media
-""",
+    [operation]
+    type = delete_item
+    target.kind = media
+    target.slide_index = 1
+    target.shape_name = Demo Media
+    """,
     mode="best_effort",
 )
 

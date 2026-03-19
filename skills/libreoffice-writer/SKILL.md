@@ -231,25 +231,25 @@ from writer import patch
 result = patch(
     "/abs/path/report.odt",
     """
-[operation]
-type = replace_text
-target.kind = text
-target.text = Draft
-new_text = Final
+    [operation]
+    type = replace_text
+    target.kind = text
+    target.text = Draft
+    new_text = Final
 
-[operation]
-type = update_table
-target.kind = table
-target.name = Summary
-data = [["Metric", "Value"], ["Revenue", "$2M"]]
+    [operation]
+    type = update_table
+    target.kind = table
+    target.name = Summary
+    data = [["Metric", "Value"], ["Revenue", "$2M"]]
 
-[operation]
-type = replace_list
-target.kind = list
-target.text = Confirm scope
-items = [{"text": "Approve release", "level": 0}, {"text": "Notify team", "level": 1}]
-list.ordered = true
-""",
+    [operation]
+    type = replace_list
+    target.kind = list
+    target.text = Confirm scope
+    items = [{"text": "Approve release", "level": 0}, {"text": "Notify team", "level": 1}]
+    list.ordered = true
+    """,
     mode="best_effort",
 )
 

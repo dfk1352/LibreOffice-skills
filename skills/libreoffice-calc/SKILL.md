@@ -348,26 +348,26 @@ from calc import patch
 result = patch(
     "/abs/path/revenue-report.ods",
     """
-[operation]
-type = write_cell
-target.kind = cell
-target.sheet = Summary
-target.row = 1
-target.col = 1
-value = Ready
-value_type = text
+    [operation]
+    type = write_cell
+    target.kind = cell
+    target.sheet = Summary
+    target.row = 1
+    target.col = 1
+    value = Ready
+    value_type = text
 
-[operation]
-type = format_range
-target.kind = cell
-target.sheet = Summary
-target.row = 1
-target.col = 1
-format.bold = true
+    [operation]
+    type = format_range
+    target.kind = cell
+    target.sheet = Summary
+    target.row = 1
+    target.col = 1
+    format.bold = true
 
-[operation]
-type = recalculate
-""",
+    [operation]
+    type = recalculate
+    """,
     mode="best_effort",
 )
 
