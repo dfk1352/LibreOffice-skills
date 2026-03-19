@@ -25,16 +25,11 @@ with the UNO API directly.
 
 ## Who This Is For
 
-This skill suite targets **AI agents** (Claude Code, OpenCode, Codex,
-Amp, Cursor, Roo Code, Kilo Code, Antigravity, and any harness that loads
-skills from `~/.agents/skills/`) that need to produce or modify real LibreOffice
-documents as part of their work.
+This skill suite targets **AI agents** (Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, and any harness that loads skills from `~/.agents/skills/`) that need to produce or modify real LibreOffice documents as part of their work.
 
-In other words, this skill suite is designed for users who want a well-tested,
-headless Python library on top of LibreOffice's UNO API, automating LibreOffice 
-operations without building the infrastructure themselves.
+In other words, this skill suite is designed for users who want a well-tested, headless Python library on top of LibreOffice's UNO API, automating LibreOffice operations without building the infrastructure themselves.
 
-Everything here is free. You can start using today.
+Local first, free to use.
 
 ---
 
@@ -69,8 +64,7 @@ brew install --cask libreoffice
 Or download the installer from the
 [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate `soffice.exe`. For non-standard installs, 
-set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the `soffice.exe` path.
+The skill scans common spots to locate `soffice.exe`. For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the `soffice.exe` path.
 
 ---
 
@@ -107,8 +101,7 @@ uv sync
 python scripts/sync_bundles.py
 ```
 
-Then copy (or symlink) the skill folders into your agent harness's skill
-directory (typically `~/.agents/skills/`):
+Then copy (or symlink) the skill folders into your agent harness's skill directory (typically `~/.agents/skills/`):
 
 ```bash
 cp -r skills/libreoffice-writer  ~/.agents/skills/
@@ -116,8 +109,7 @@ cp -r skills/libreoffice-calc    ~/.agents/skills/
 cp -r skills/libreoffice-impress ~/.agents/skills/
 ```
 
-If the `uno` Python module is not on the default path (common on Linux), add
-the system UNO package alongside it:
+If the `uno` Python module is not on the default path (common on Linux), add the system UNO package alongside it:
 
 ```bash
 export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/python3/dist-packages"
@@ -127,97 +119,55 @@ export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/pyth
 
 ## Why This Exists
 
-LibreOffice's UNO API is powerful but notoriously difficult. Agents that try 
-to drive it directly spend most of their token budget on error recovery rather 
-than the actual task.
+LibreOffice's UNO API is powerful but notoriously difficult. Agents that try to drive it directly spend most of their token budget on error recovery rather than the actual task.
 
-This skill suite aims to solves that by packaging the UNO complexity behind a small,
-predictable interface:
+This skill suite aims to solves that by packaging the UNO complexity behind a small, predictable interface:
 
-- **Session-based editing** — open a document once, make all your changes
-  through a single live connection, close and save. No per-operation process
-  spawning overhead, no race conditions.
-- **Patch DSL** — express a multi-step edit plan as a single structured
-  string and get back a machine-readable result. Supports `atomic` mode
-  (all-or-nothing) and `best_effort` mode (apply what you can, report what
-  failed).
-- **Isolated headless process** — each session launches LibreOffice with a
-  throwaway user profile and a unique named pipe. Nothing leaks between
-  sessions; CI servers stay clean.
-- **Visual verification** — every skill exposes a snapshot function that
-  exports a PNG of a page, spreadsheet area, or slide, so an agent can
-  inspect the rendered output before handing the file to the user.
-- **Zero install on the agent side** — the `scripts/` bundle is a
-  self-contained Python package. Drop it on `PYTHONPATH` and
-  `import writer` / `import calc` / `import impress` just works.
+- **Session-based editing** — open a document once, make all your changes through a single live connection, close and save. No per-operation process  spawning overhead, no race conditions.
+- **Patch DSL** — express a multi-step edit plan as a single structured string and get back a machine-readable result. Supports `atomic` mode (all-or-nothing) and `best_effort` mode (apply what you can, report what failed).
+- **Isolated headless process** — each session launches LibreOffice with a throwaway user profile and a unique named pipe. Nothing leaks between sessions; CI servers stay clean.
+- **Visual verification** — every skill exposes a snapshot function that exports a PNG of a page, spreadsheet area, or slide, so an agent can inspect the rendered output before handing the file to the user.
+- **Zero install on the agent side** — the `scripts/` bundle is a self-contained Python package. Drop it on `PYTHONPATH` and `import writer` / `import calc` / `import impress` just works.
 
 ---
 
 ## What's Included
 
-Three skills ship in this repository, all sharing the same session/patch design
-and the same underlying UNO bridge.
+Three skills ship in this repository, all sharing the same session/patch design and the same underlying UNO bridge.
 
 ### Writer (`libreoffice-writer`) — `.odt` documents
 
 Full document lifecycle: create, open, read, edit, save, export to PDF or DOCX.
 
-Editing operations cover text insertion and replacement, rich character and
-paragraph formatting (font, size, color, bold, italic, alignment, spacing),
-tables (insert, update, delete), images (embed with size control), and
-unordered/ordered lists.
+Editing operations cover text insertion and replacement, rich character and paragraph formatting (font, size, color, bold, italic, alignment, spacing), tables (insert, update, delete), images (embed with size control), and unordered/ordered lists.
 
 ### Calc (`libreoffice-calc`) — `.ods` spreadsheets
 
-Create and edit spreadsheets with full cell and range operations: read/write
-values and formulas, bulk range writes, named ranges, number formatting,
-cell styles (font, color, borders, alignment), sheet management (add, rename,
-delete), data validation rules, and chart creation (bar, line, pie, scatter).
+Create and edit spreadsheets with full cell and range operations: read/write values and formulas, bulk range writes, named ranges, number formatting, cell styles (font, color, borders, alignment), sheet management (add, rename, delete), data validation rules, and chart creation (bar, line, pie, scatter).
 
 ### Impress (`libreoffice-impress`) — `.odp` presentations
 
-Complete slide deck authoring: add, delete, move, and duplicate slides; insert
-text boxes, shapes, images, tables, charts, and audio/video; set speaker notes;
-manage master pages (list, apply, import from template, set background color);
-and export to PDF or PPTX.
+Complete slide deck authoring: add, delete, move, and duplicate slides; insert text boxes, shapes, images, tables, charts, and audio/video; set speaker notes; manage master pages (list, apply, import from template, set background color); and export to PDF or PPTX.
 
 ### Shared Infrastructure
 
 All three skills include the same set of shared modules:
 
 - **UNO Bridge** — headless LibreOffice process management and connection.
-- **Session base** — `BaseSession` with context-manager support and
-  closed-guard semantics.
-- **Color helpers** — `resolve_color()` accepts CSS color names (`"cornflowerblue"`)
-  or `0xRRGGBB` integers interchangeably.
-- **Exception hierarchy** — app-specific errors (`WriterSkillError`,
-  `CalcSkillError`, `ImpressSkillError`) with precise subclasses for target
-  resolution failures, ambiguous matches, and formatting errors.
-- **Snapshot tool** — app-specific utility to help agents with visual modality to 
-  verify editting results.
+- **Session base** — `BaseSession` with context-manager support and closed-guard semantics.
+- **Color helpers** — `resolve_color()` accepts CSS color names (`"cornflowerblue"`) or `0xRRGGBB` integers interchangeably.
+- **Exception hierarchy** — app-specific errors (`WriterSkillError`, `CalcSkillError`, `ImpressSkillError`) with precise subclasses for target resolution failures, ambiguous matches, and formatting errors.
+- **Snapshot tool** — app-specific utility to help agents with visual modality to verify editting results.
 
 ---
 
 ## How It Works
 
-The central design decision is that each editing session maps to exactly one
-headless LibreOffice process and one open document. The process is spawned with
-a unique named pipe and a temporary, isolated user profile that is discarded on
-exit. Nothing persists between sessions; no global state can accumulate.
+The central design decision is that each editing session maps to exactly one headless LibreOffice process and one open document. The process is spawned with a unique named pipe and a temporary, isolated user profile that is discarded on exit. Nothing persists between sessions; no global state can accumulate.
 
-Within a session, every operation goes through the live UNO connection — text
-insertions, cell writes, slide manipulations — without reopening the file each
-time. When the session closes (or its context manager exits), the document is
-saved and the process is terminated.
+Within a session, every operation goes through the live UNO connection — text insertions, cell writes, slide manipulations — without reopening the file each time. When the session closes (or its context manager exits), the document is saved and the process is terminated.
 
-The **patch interface** is a higher-level layer on top of sessions. It accepts
-an INI-style string describing one or more operations, executes them in order
-against the open document, and returns a `PatchApplyResult` with per-operation
-status. In `atomic` mode, any failure rolls back all changes and leaves the
-file untouched. In `best_effort` mode, successful operations are kept and
-failures are reported individually. This makes patch suitable for agent
-workflows where the agent generates an edit plan up front and wants to know
-precisely what succeeded.
+The **patch interface** is a higher-level layer on top of sessions. It accepts an INI-style string describing one or more operations, executes them in order against the open document, and returns a `PatchApplyResult` with per-operation status. In `atomic` mode, any failure rolls back all changes and leaves the file untouched. In `best_effort` mode, successful operations are kept and failures are reported individually. This makes patch suitable for agent workflows where the agent generates an edit plan up front and wants to know precisely what succeeded.
 
 ---
 
@@ -254,9 +204,7 @@ result = writer.snapshot_page("report.odt", "report_preview.png", page=1)
 
 ### Patch DSL — batch-editing a spreadsheet
 
-The patch interface lets an agent express an entire edit plan as a single
-string. This is useful when an agent wants to compose the full set of changes
-before committing any of them.
+The patch interface lets an agent express an entire edit plan as a single string. This is useful when an agent wants to compose the full set of changes before committing any of them.
 
 ```python
 import calc
