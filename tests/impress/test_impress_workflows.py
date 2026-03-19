@@ -1,385 +1,545 @@
-"""Integration workflow tests for Impress skill."""
+"""Integration workflow tests for Impress session-first workflows."""
 
-import struct
-import wave
+# pyright: reportMissingImports=false, reportAttributeAccessIssue=false
+
+from __future__ import annotations
+
 from pathlib import Path
 
-from PIL import Image
-
-
-def _create_minimal_wav(path: Path) -> None:
-    """Create a minimal valid WAV file for testing."""
-    with wave.open(str(path), "w") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(44100)
-        w.writeframes(struct.pack("<h", 0) * 100)
-
-
-def _create_minimal_video(path: Path) -> None:
-    """Create a minimal file to act as a video placeholder."""
-    path.write_bytes(b"\x00" * 100)
+from tests.impress._helpers import (
+    BLANK_LAYOUT,
+    TITLE_ONLY_LAYOUT,
+    TITLE_AND_CONTENT_LAYOUT,
+    append_slide,
+    create_test_audio,
+    create_test_image,
+    create_test_video,
+    get_chart_details,
+    get_list_paragraphs,
+    get_master_background,
+    get_media_url,
+    get_notes_text,
+    get_shape_text,
+    get_slide_master_name,
+    get_slide_shapes,
+    get_table_matrix,
+    get_text_properties,
+    open_impress_doc,
+)
 
 
 def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
-    """Build an Impress presentation exercising every public function.
-
-    This is the single function that produces all inspectable output
-    files.  It exercises every public function from every Impress module
-    plus the Impress find_replace module.
-
-    Args:
-        output_dir: Directory where all output files are written.
-
-    Returns:
-        Dict mapping logical names to output file paths:
-            "presentation"      -> presentation.odp
-            "snapshot_before"   -> snapshot_before.png
-            "snapshot_after"    -> snapshot_after.png
-            "export_pdf"        -> presentation.pdf
-            "export_pptx"       -> presentation.pptx
-            "slide_images"      -> list stored in output_dir/slides/
-    """
-    from impress.charts import add_chart
-    from impress.content import (
-        add_image,
-        add_shape,
-        add_text_box,
-        set_body,
-        set_title,
+    """Build Impress workflow artifacts that exercise every public tool."""
+    from impress import (
+        ImpressTarget,
+        ListItem,
+        ShapePlacement,
+        TextFormatting,
+        open_impress_session,
+        patch,
+        snapshot_slide,
     )
-    from impress.core import (
-        create_presentation,
-        export_presentation,
-        get_slide_count,
-    )
-    from impress.find_replace import find_replace
-    from impress.formatting import (
-        format_shape_text,
-        set_slide_background,
-    )
-    from impress.master import (
-        apply_master_page,
-        import_master_from_template,
-        list_master_pages,
-    )
-    from impress.media import add_audio, add_video
-    from impress.notes import get_notes, set_notes
-    from impress.slides import (
-        add_slide,
-        delete_slide,
-        duplicate_slide,
-        get_slide_inventory,
-        move_slide,
-    )
-    from impress.snapshot import snapshot_slide
-    from impress.tables import (
-        add_table,
-        format_table_cell,
-        set_table_cell,
-    )
+    from impress.core import create_presentation
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # ------------------------------------------------------------------
-    # 1. Create presentation
-    # ------------------------------------------------------------------
-    pres_path = output_dir / "presentation.odp"
-    create_presentation(str(pres_path))
+    session_doc = output_dir / "session_workflow.odp"
+    create_presentation(str(session_doc))
 
-    count = get_slide_count(str(pres_path))
-    assert count == 1, f"Expected 1 slide, got {count}"
-
-    # ------------------------------------------------------------------
-    # 2. Add slides with various layouts
-    # ------------------------------------------------------------------
-    add_slide(str(pres_path), layout="TITLE_SLIDE")  # slide 1
-    add_slide(str(pres_path), layout="TITLE_AND_CONTENT")  # slide 2
-    add_slide(str(pres_path), layout="BLANK")  # slide 3
-    add_slide(str(pres_path), layout="TITLE_ONLY")  # slide 4
-
-    count = get_slide_count(str(pres_path))
-    assert count == 5, f"Expected 5 slides, got {count}"
-
-    # ------------------------------------------------------------------
-    # 3. Set title and body text
-    # ------------------------------------------------------------------
-    set_title(str(pres_path), 1, "Welcome to Integration Test")
-    set_body(str(pres_path), 2, "This slide has body content.")
-
-    # ------------------------------------------------------------------
-    # 4. Add text box, shapes, and image
-    # ------------------------------------------------------------------
-    tb_idx = add_text_box(
-        str(pres_path),
-        3,
-        "Integration box",
-        2.0,
-        2.0,
-        12.0,
-        3.0,
-    )
-    assert isinstance(tb_idx, int)
-
-    shape_idx = add_shape(
-        str(pres_path),
-        3,
-        "rectangle",
-        2.0,
-        6.0,
-        5.0,
-        4.0,
-        fill_color="cornflowerblue",
-        line_color="black",
-    )
-    assert isinstance(shape_idx, int)
-
-    # Create a test image and add it
-    img_path = output_dir / "test_image.png"
-    img = Image.new("RGB", (100, 100), color="blue")
-    img.save(img_path)
-    img_idx = add_image(str(pres_path), 3, str(img_path), 14.0, 2.0, 5.0, 5.0)
-    assert isinstance(img_idx, int)
-
-    # ------------------------------------------------------------------
-    # 5. Snapshot BEFORE formatting (slide 0 — the default blank slide)
-    # ------------------------------------------------------------------
-    before_path = output_dir / "snapshot_before.png"
-    snap_result = snapshot_slide(str(pres_path), 0, str(before_path))
-    assert before_path.exists()
-    assert snap_result.width > 0
-    assert snap_result.height > 0
-
-    # ------------------------------------------------------------------
-    # 6. Add table with data, set and format cells
-    # ------------------------------------------------------------------
-    table_data = [
-        ["Category", "Value"],
-        ["Alpha", "100"],
-        ["Beta", "200"],
-    ]
-    tbl_idx = add_table(str(pres_path), 3, 3, 2, 2.0, 11.0, 12.0, 5.0, data=table_data)
-    assert isinstance(tbl_idx, int)
-
-    set_table_cell(str(pres_path), 3, tbl_idx, 2, 1, "250")
-    format_table_cell(
-        str(pres_path),
-        3,
-        tbl_idx,
-        0,
-        0,
-        bold=True,
-        font_size=14,
-        fill_color="lightgray",
-    )
-
-    # ------------------------------------------------------------------
-    # 7. Add chart
-    # ------------------------------------------------------------------
-    chart_data = [
-        ["", "Q1", "Q2"],
-        ["Sales", 100, 200],
-        ["Costs", 80, 150],
-    ]
-    chart_idx = add_chart(
-        str(pres_path),
-        4,
-        "bar",
-        chart_data,
-        1.0,
-        1.0,
-        20.0,
-        14.0,
-        title="Sales Chart",
-    )
-    assert isinstance(chart_idx, int)
-
-    # ------------------------------------------------------------------
-    # 8. List and apply master pages
-    # ------------------------------------------------------------------
-    masters = list_master_pages(str(pres_path))
-    assert len(masters) >= 1
-
-    # Apply existing master to a single slide
-    apply_master_page(str(pres_path), masters[0])
-
-    # Import master from a template (use the presentation itself as
-    # a template — the function imports from any .odp/.otp file)
+    logo_v1 = create_test_image(output_dir / "logo_v1.png", color="blue")
+    logo_v2 = create_test_image(output_dir / "logo_v2.png", color="green")
+    audio_path = create_test_audio(output_dir / "sample.wav")
+    video_path = create_test_video(output_dir / "sample.mp4")
     template_path = output_dir / "template.odp"
     create_presentation(str(template_path))
-    imported_name = import_master_from_template(str(pres_path), str(template_path))
-    assert isinstance(imported_name, str)
+    with open_impress_doc(template_path) as template_doc:
+        append_slide(template_doc, TITLE_AND_CONTENT_LAYOUT)
+        template_doc.store()
 
-    from impress.master import set_master_background
+    snapshot_before = output_dir / "snapshot_before.png"
+    snapshot_after = output_dir / "snapshot_after.png"
+    workflow_pdf = output_dir / "presentation.pdf"
+    workflow_pptx = output_dir / "presentation.pptx"
 
-    set_master_background(str(pres_path), imported_name, "lightsteelblue")
-    apply_master_page(str(pres_path), imported_name)
+    with open_impress_session(str(session_doc)) as session:
+        assert session.get_slide_count() == 1
+        session.add_slide(layout="TITLE_AND_CONTENT")
+        session.add_slide(layout="BLANK")
+        session.add_slide(layout="TITLE_ONLY")
+        session.add_slide(index=2, layout="BLANK")
 
-    # ------------------------------------------------------------------
-    # 9. Find & replace
-    # ------------------------------------------------------------------
-    replacements = find_replace(str(pres_path), "Integration", "E2E", match_case=True)
-    assert isinstance(replacements, int)
+        session.insert_text(
+            "Executive Summary",
+            ImpressTarget(kind="insertion", slide_index=1, placeholder="title"),
+        )
+        session.insert_text(
+            "Quarterly revenue rose 18%.",
+            ImpressTarget(kind="insertion", slide_index=1, placeholder="body"),
+        )
+        assert (
+            session.read_text(
+                ImpressTarget(kind="text", slide_index=1, placeholder="body")
+            )
+            == "Quarterly revenue rose 18%."
+        )
+        session.replace_text(
+            ImpressTarget(kind="text", slide_index=1, placeholder="body"),
+            "Quarterly revenue rose 21%.",
+        )
 
-    # ------------------------------------------------------------------
-    # 10. Format shape text, set background
-    # ------------------------------------------------------------------
-    format_shape_text(
-        str(pres_path),
-        3,
-        tb_idx,
-        bold=True,
-        italic=True,
-        font_size=20,
-        font_name="Liberation Sans Narrow",
-        color="red",
-        alignment="center",
+        session.insert_text_box(
+            ImpressTarget(kind="slide", slide_index=2),
+            "Action Items\nRemove this line",
+            ShapePlacement(1.0, 1.0, 7.5, 4.0),
+            name="Agenda Box",
+        )
+        session.delete_item(
+            ImpressTarget(
+                kind="text",
+                slide_index=2,
+                shape_name="Agenda Box",
+                text="Remove this line",
+            )
+        )
+        session.insert_text(
+            "\nStatus update",
+            ImpressTarget(
+                kind="insertion",
+                slide_index=2,
+                shape_name="Agenda Box",
+                after="Action Items",
+            ),
+        )
+        session.insert_text_box(
+            ImpressTarget(kind="slide", slide_index=2),
+            "Priority Update",
+            ShapePlacement(9.0, 1.0, 4.0, 1.8),
+            name="Callout Box",
+        )
+        session.format_text(
+            ImpressTarget(kind="text", slide_index=2, shape_name="Callout Box"),
+            TextFormatting(
+                bold=True,
+                italic=True,
+                font_name="Liberation Sans Narrow",
+                font_size=18,
+                color="red",
+                align="center",
+            ),
+        )
+
+        session.insert_list(
+            [
+                ListItem(text="Confirm scope", level=0),
+                ListItem(text="Review outputs", level=0),
+            ],
+            ordered=False,
+            target=ImpressTarget(
+                kind="insertion",
+                slide_index=2,
+                shape_name="Agenda Box",
+                after="Status update",
+            ),
+        )
+        session.replace_list(
+            ImpressTarget(
+                kind="list",
+                slide_index=2,
+                shape_name="Agenda Box",
+                text="Confirm scope",
+            ),
+            [
+                ListItem(text="Publish package", level=0),
+                ListItem(text="Collect approvals", level=1),
+            ],
+            ordered=True,
+        )
+        session.delete_item(
+            ImpressTarget(
+                kind="list",
+                slide_index=2,
+                shape_name="Agenda Box",
+                text="Publish package",
+            )
+        )
+        session.insert_list(
+            [
+                ListItem(text="Escalate blocker", level=0),
+                ListItem(text="Collect approvals", level=1),
+            ],
+            ordered=False,
+            target=ImpressTarget(
+                kind="insertion",
+                slide_index=2,
+                shape_name="Agenda Box",
+                after="Status update",
+            ),
+        )
+
+        session.insert_shape(
+            ImpressTarget(kind="slide", slide_index=2),
+            "rectangle",
+            ShapePlacement(13.0, 1.0, 4.0, 2.0),
+            fill_color="navy",
+            line_color="black",
+            name="Accent Shape",
+        )
+        session.delete_item(
+            ImpressTarget(kind="shape", slide_index=2, shape_name="Accent Shape")
+        )
+        session.insert_shape(
+            ImpressTarget(kind="slide", slide_index=2),
+            "ellipse",
+            ShapePlacement(14.0, 1.0, 3.2, 1.8),
+            fill_color="gold",
+            line_color="black",
+            name="Badge Shape",
+        )
+
+        session.insert_image(
+            ImpressTarget(kind="slide", slide_index=2),
+            str(logo_v1),
+            ShapePlacement(14.0, 3.2, 3.5, 3.5),
+            name="Logo",
+        )
+        session.insert_image(
+            ImpressTarget(kind="slide", slide_index=2),
+            str(logo_v1),
+            ShapePlacement(17.8, 3.2, 1.8, 1.8),
+            name="Disposable Logo",
+        )
+        session.replace_image(
+            ImpressTarget(kind="image", slide_index=2, shape_name="Logo"),
+            image_path=str(logo_v2),
+            placement=ShapePlacement(14.0, 3.3, 4.0, 4.0),
+        )
+        session.delete_item(
+            ImpressTarget(kind="image", slide_index=2, shape_name="Disposable Logo")
+        )
+
+        session.insert_table(
+            ImpressTarget(kind="slide", slide_index=2),
+            3,
+            2,
+            ShapePlacement(1.0, 6.2, 11.0, 3.8),
+            data=[["Metric", "Value"], ["Revenue", "100"], ["Cost", "80"]],
+            name="Metrics Table",
+        )
+        session.update_table(
+            ImpressTarget(kind="table", slide_index=2, shape_name="Metrics Table"),
+            [["Metric", "Value"], ["Revenue", "120"], ["Cost", "90"]],
+        )
+        session.insert_table(
+            ImpressTarget(kind="slide", slide_index=2),
+            1,
+            1,
+            ShapePlacement(11.5, 10.0, 2.5, 1.5),
+            data=[["X"]],
+            name="Disposable Table",
+        )
+        session.delete_item(
+            ImpressTarget(kind="table", slide_index=2, shape_name="Disposable Table")
+        )
+
+        session.insert_chart(
+            ImpressTarget(kind="slide", slide_index=4),
+            "bar",
+            [["Category", "Value"], ["Revenue", 100], ["Cost", 80]],
+            ShapePlacement(1.0, 1.0, 10.0, 6.0),
+            title="Revenue Trend",
+            name="Revenue Chart",
+        )
+        session.insert_chart(
+            ImpressTarget(kind="slide", slide_index=4),
+            "line",
+            [["Category", "Value"], ["Temp", 1]],
+            ShapePlacement(12.0, 1.0, 6.0, 4.0),
+            title="Disposable Chart",
+            name="Disposable Chart",
+        )
+        session.update_chart(
+            ImpressTarget(kind="chart", slide_index=4, shape_name="Revenue Chart"),
+            chart_type="line",
+            data=[["Category", "Value"], ["Revenue", 110], ["Cost", 75]],
+            placement=ShapePlacement(2.0, 1.5, 12.0, 7.0),
+            title="Revenue Trend Updated",
+        )
+        session.delete_item(
+            ImpressTarget(kind="chart", slide_index=4, shape_name="Disposable Chart")
+        )
+
+        session.insert_media(
+            ImpressTarget(kind="slide", slide_index=4),
+            str(video_path),
+            ShapePlacement(1.0, 9.0, 5.0, 4.0),
+            name="Demo Media",
+        )
+        session.insert_media(
+            ImpressTarget(kind="slide", slide_index=4),
+            str(video_path),
+            ShapePlacement(6.5, 9.0, 4.0, 3.0),
+            name="Disposable Media",
+        )
+        session.replace_media(
+            ImpressTarget(kind="media", slide_index=4, shape_name="Demo Media"),
+            media_path=str(audio_path),
+            placement=ShapePlacement(1.5, 9.5, 5.5, 3.5),
+        )
+        session.delete_item(
+            ImpressTarget(kind="media", slide_index=4, shape_name="Disposable Media")
+        )
+
+        imported_master = session.import_master_page(str(template_path))
+        session.set_master_background(
+            ImpressTarget(kind="master_page", master_name=imported_master),
+            "lightsteelblue",
+        )
+        session.apply_master_page(
+            ImpressTarget(kind="slide", slide_index=2),
+            ImpressTarget(kind="master_page", master_name=imported_master),
+        )
+
+        inventory = session.get_slide_inventory(
+            ImpressTarget(kind="slide", slide_index=2)
+        )
+        assert inventory["shape_count"] >= 3
+
+        session.duplicate_slide(ImpressTarget(kind="slide", slide_index=0))
+        session.move_slide(ImpressTarget(kind="slide", slide_index=1), 5)
+        session.delete_slide(ImpressTarget(kind="slide", slide_index=5))
+        assert session.get_slide_count() == 5
+
+        session.set_notes(
+            ImpressTarget(kind="notes", slide_index=4),
+            "Remember to greet the audience.",
+        )
+        assert (
+            "greet"
+            in session.get_notes(ImpressTarget(kind="notes", slide_index=4)).lower()
+        )
+
+    snapshot_slide(str(session_doc), 2, str(snapshot_before))
+
+    with open_impress_session(str(session_doc)) as session:
+        patch_result = session.patch(
+            "[operation]\n"
+            "type = insert_text\n"
+            "target.kind = insertion\n"
+            "target.slide_index = 2\n"
+            "target.shape_name = Agenda Box\n"
+            "target.after = Status update\n"
+            "text <<EOF\n"
+            "\nPatched paragraph\n"
+            "EOF\n"
+            "[operation]\n"
+            "type = format_text\n"
+            "target.kind = text\n"
+            "target.slide_index = 2\n"
+            "target.shape_name = Callout Box\n"
+            "target.text = Priority Update\n"
+            "format.underline = true\n"
+            "[operation]\n"
+            "type = format_text\n"
+            "target.kind = text\n"
+            "target.slide_index = 2\n"
+            "target.shape_name = Agenda Box\n"
+            "target.text = Patched paragraph\n"
+            "format.underline = true\n"
+            "[operation]\n"
+            "type = insert_list\n"
+            "target.kind = insertion\n"
+            "target.slide_index = 2\n"
+            "target.shape_name = Agenda Box\n"
+            "target.after = Patched paragraph\n"
+            "list.ordered = false\n"
+            'items = [{"text": "Patched checklist", "level": 0}]\n',
+            mode="atomic",
+        )
+        assert patch_result.overall_status == "ok", patch_result.operations
+
+        session.export(str(workflow_pdf), "pdf")
+        session.export(str(workflow_pptx), "pptx")
+
+    snapshot_slide(str(session_doc), 2, str(snapshot_after))
+
+    atomic_doc = output_dir / "patch_atomic.odp"
+    create_presentation(str(atomic_doc))
+    with open_impress_session(str(atomic_doc)) as session:
+        session.add_slide(layout="TITLE_AND_CONTENT")
+        session.insert_text(
+            "Atomic body",
+            ImpressTarget(kind="insertion", slide_index=1, placeholder="body"),
+        )
+
+    patch(
+        str(atomic_doc),
+        "[operation]\n"
+        "type = replace_text\n"
+        "target.kind = text\n"
+        "target.slide_index = 1\n"
+        "target.placeholder = body\n"
+        "new_text = rolled back\n"
+        "[operation]\n"
+        "type = delete_item\n"
+        "target.kind = chart\n"
+        "target.slide_index = 1\n"
+        "target.shape_name = Missing Chart\n"
+        "[operation]\n"
+        "type = set_notes\n"
+        "target.kind = notes\n"
+        "target.slide_index = 1\n"
+        "text = skipped later\n",
+        mode="atomic",
     )
 
-    set_slide_background(str(pres_path), 3, "navy")
+    best_effort_doc = output_dir / "patch_best_effort.odp"
+    create_presentation(str(best_effort_doc))
+    with open_impress_session(str(best_effort_doc)) as session:
+        session.add_slide(layout="TITLE_AND_CONTENT")
+        session.insert_text_box(
+            ImpressTarget(kind="slide", slide_index=1),
+            "Action Items",
+            ShapePlacement(1.0, 1.0, 10.0, 4.0),
+            name="Agenda Box",
+        )
 
-    # ------------------------------------------------------------------
-    # 11. Add media (audio and video)
-    # ------------------------------------------------------------------
-    wav_path = output_dir / "test.wav"
-    _create_minimal_wav(wav_path)
-    audio_idx = add_audio(str(pres_path), 3, str(wav_path), 18.0, 12.0, 2.0, 2.0)
-    assert isinstance(audio_idx, int)
-
-    video_path = output_dir / "test.mp4"
-    _create_minimal_video(video_path)
-    video_idx = add_video(str(pres_path), 3, str(video_path), 20.0, 12.0, 3.0, 3.0)
-    assert isinstance(video_idx, int)
-
-    # ------------------------------------------------------------------
-    # 12. Duplicate, delete, move slides
-    # ------------------------------------------------------------------
-    # Duplicate slide 3 (the content-rich slide) → new slide at index 4
-    duplicate_slide(str(pres_path), 3)
-    count = get_slide_count(str(pres_path))
-    assert count == 6, f"Expected 6 slides after duplicate, got {count}"
-
-    # Move the duplicate from index 4 to index 1
-    move_slide(str(pres_path), 4, 1)
-
-    moved_inventory = get_slide_inventory(str(pres_path), 1)
-    assert moved_inventory["shape_count"] >= 3
-
-    # Delete the moved duplicate
-    delete_slide(str(pres_path), 1)
-    count = get_slide_count(str(pres_path))
-    assert count == 5, f"Expected 5 slides after delete, got {count}"
-
-    # ------------------------------------------------------------------
-    # 13. Get slide inventory
-    # ------------------------------------------------------------------
-    inventory = get_slide_inventory(str(pres_path), 3)
-    assert inventory["slide_index"] == 3
-    assert inventory["shape_count"] >= 1
-    assert isinstance(inventory["shapes"], list)
-
-    # ------------------------------------------------------------------
-    # 14. Set speaker notes, read them back
-    # ------------------------------------------------------------------
-    set_notes(str(pres_path), 1, "Remember to greet the audience.")
-    notes_text = get_notes(str(pres_path), 1)
-    assert "greet" in notes_text.lower()
-
-    # ------------------------------------------------------------------
-    # 15. Snapshot AFTER formatting
-    # ------------------------------------------------------------------
-    after_path = output_dir / "snapshot_after.png"
-    snapshot_slide(str(pres_path), 3, str(after_path))
-    assert after_path.exists()
-
-    # ------------------------------------------------------------------
-    # 16. Export to PDF and PPTX
-    # ------------------------------------------------------------------
-    pdf_path = output_dir / "presentation.pdf"
-    export_presentation(str(pres_path), str(pdf_path), "pdf")
-    assert pdf_path.exists()
-
-    pptx_path = output_dir / "presentation.pptx"
-    export_presentation(str(pres_path), str(pptx_path), "pptx")
-    assert pptx_path.exists()
+    patch(
+        str(best_effort_doc),
+        "[operation]\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.slide_index = 1\n"
+        "target.shape_name = Agenda Box\n"
+        "target.after = Action Items\n"
+        "list.ordered = false\n"
+        'items = [{"text": "Best effort addition", "level": 0}]\n'
+        "[operation]\n"
+        "type = replace_media\n"
+        "target.kind = media\n"
+        "target.slide_index = 1\n"
+        "target.shape_name = Missing Media\n"
+        f"media_path = {audio_path}\n"
+        "[operation]\n"
+        "type = set_notes\n"
+        "target.kind = notes\n"
+        "target.slide_index = 1\n"
+        "text = Best effort notes\n",
+        mode="best_effort",
+    )
 
     return {
-        "presentation": pres_path,
-        "snapshot_before": before_path,
-        "snapshot_after": after_path,
-        "export_pdf": pdf_path,
-        "export_pptx": pptx_path,
+        "session_workflow": session_doc,
+        "patch_atomic": atomic_doc,
+        "patch_best_effort": best_effort_doc,
+        "workflow_pdf": workflow_pdf,
+        "workflow_pptx": workflow_pptx,
+        "snapshot_before": snapshot_before,
+        "snapshot_after": snapshot_after,
     }
 
 
-# ---------------------------------------------------------------------------
-# Deterministic assertion tests
-# ---------------------------------------------------------------------------
-
-
-def test_workflow_content_assertions(tmp_path):
-    """Run the workflow in tmp_path and assert document structure.
-
-    Verifies:
-        - At least 5 slides in the final presentation.
-        - The title slide contains expected text.
-        - The content-rich slide has multiple shapes.
-        - Speaker notes are present.
-        - All exported files exist.
-    """
-    from impress.core import get_slide_count
-    from impress.notes import get_notes
-    from impress.slides import get_slide_inventory
-
+def test_session_workflow_document_state(tmp_path):
+    """Session workflow leaves visible traces for every major editing domain."""
     outputs = run_end_to_end_workflow(tmp_path)
-    pres = str(outputs["presentation"])
 
-    # Slide count >= 5
-    count = get_slide_count(pres)
-    assert count >= 5, f"Expected >= 5 slides, got {count}"
+    assert get_shape_text(outputs["session_workflow"], 1, placeholder="title") == (
+        "Executive Summary"
+    )
+    assert get_shape_text(outputs["session_workflow"], 1, placeholder="body") == (
+        "Quarterly revenue rose 21%."
+    )
 
-    # Find/replace applied ("Integration" -> "E2E")
-    texts = []
-    for idx in range(get_slide_count(pres)):
-        inv = get_slide_inventory(pres, idx)
-        texts.extend([s["text"] for s in inv["shapes"] if s["text"]])
-    assert any("E2E" in t for t in texts), f"Expected 'E2E' in texts: {texts}"
+    agenda_text = get_shape_text(outputs["session_workflow"], 2, name="Agenda Box")
+    assert "Status update" in agenda_text
+    assert "Patched paragraph" in agenda_text
+    assert "Remove this line" not in agenda_text
+    assert [
+        item["text"]
+        for item in get_list_paragraphs(
+            outputs["session_workflow"], 2, name="Agenda Box"
+        )
+    ] == ["Patched checklist", "Escalate blocker", "Collect approvals"]
 
-    # Content-rich slide has multiple shapes (find a slide with >= 3 shapes)
-    max_shapes = 0
-    for idx in range(get_slide_count(pres)):
-        inv_any = get_slide_inventory(pres, idx)
-        max_shapes = max(max_shapes, inv_any["shape_count"])
-    assert max_shapes >= 3, f"Expected >= 3 shapes on a slide, got {max_shapes}"
+    properties = get_text_properties(outputs["session_workflow"], 2, name="Callout Box")
+    assert properties["char_weight"] == 150
+    assert properties["char_posture"] == 2
+    assert properties["align"] in {2, 3}
 
-    # Speaker notes are present on slide 1
-    notes = get_notes(pres, 1)
-    assert "greet" in notes.lower(), f"Expected 'greet' in notes: {notes}"
+    names = [
+        shape["name"] for shape in get_slide_shapes(outputs["session_workflow"], 2)
+    ]
+    assert "Badge_Shape" in names
+    assert "Callout_Box" in names
+    assert "Logo" in names
+    assert "Metrics_Table" in names
 
-    # All output files exist
-    for key, path in outputs.items():
+    assert get_media_url(outputs["session_workflow"], 2, name="Logo").endswith(
+        "logo_v2.png"
+    )
+    assert get_table_matrix(outputs["session_workflow"], 2, name="Metrics Table") == [
+        ["Metric", "Value"],
+        ["Revenue", "120"],
+        ["Cost", "90"],
+    ]
+
+    chart = get_chart_details(outputs["session_workflow"], 4, name="Revenue Chart")
+    assert chart["title"] == "Revenue Trend Updated"
+    assert chart["x"] == 2000
+    assert get_media_url(outputs["session_workflow"], 4, name="Demo Media").endswith(
+        "sample.wav"
+    )
+    assert (
+        get_notes_text(outputs["session_workflow"], 4)
+        == "Remember to greet the audience."
+    )
+
+    master_name = get_slide_master_name(outputs["session_workflow"], 2)
+    assert master_name
+    assert get_master_background(outputs["session_workflow"], master_name) == 0xB0C4DE
+
+    with open_impress_doc(outputs["session_workflow"]) as doc:
+        layouts = [
+            int(doc.DrawPages.getByIndex(index).Layout)
+            for index in range(doc.DrawPages.Count)
+        ]
+    assert layouts.count(TITLE_AND_CONTENT_LAYOUT) == 1
+    assert layouts.count(TITLE_ONLY_LAYOUT) == 1
+    assert layouts.count(BLANK_LAYOUT) == 2
+
+    for key in (
+        "session_workflow",
+        "workflow_pdf",
+        "workflow_pptx",
+        "snapshot_before",
+        "snapshot_after",
+    ):
+        path = outputs[key]
         assert path.exists(), f"{key} not found at {path}"
         assert path.stat().st_size > 0, f"{key} is empty at {path}"
 
 
+def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_path):
+    """Standalone patch workflow preserves atomic rollback and best-effort saves."""
+    outputs = run_end_to_end_workflow(tmp_path)
+
+    assert (
+        get_shape_text(outputs["patch_atomic"], 1, placeholder="body") == "Atomic body"
+    )
+    assert get_notes_text(outputs["patch_atomic"], 1) == ""
+
+    assert [
+        item["text"]
+        for item in get_list_paragraphs(
+            outputs["patch_best_effort"], 1, name="Agenda Box"
+        )
+    ] == ["Best effort addition"]
+    assert get_notes_text(outputs["patch_best_effort"], 1) == "Best effort notes"
+
+
 def test_workflow_outputs_to_test_output_dir():
-    """Produce inspectable output files in test-output/impress/.
-
-    Calls run_end_to_end_workflow which builds a presentation,
-    snapshots before and after content/formatting changes. Assertions
-    verify that all output files exist, are non-empty, and the
-    before/after snapshots differ.
-
-    Output files:
-        test-output/impress/presentation.odp
-        test-output/impress/presentation.pdf
-        test-output/impress/presentation.pptx
-        test-output/impress/snapshot_before.png
-        test-output/impress/snapshot_after.png
-    """
+    """Produce inspectable workflow artifacts in test-output/impress/."""
     output_dir = Path("test-output/impress")
 
-    # Clean up previous runs
     if output_dir.exists():
         import shutil
 
@@ -387,16 +547,13 @@ def test_workflow_outputs_to_test_output_dir():
 
     outputs = run_end_to_end_workflow(output_dir)
 
-    # Assert all output files exist and are non-empty
     for key, path in outputs.items():
         assert path.exists(), f"{key} not found at {path}"
         assert path.stat().st_size > 0, f"{key} is empty at {path}"
 
-    # Assert PNG magic bytes on both snapshots
-    for key in ("snapshot_before", "snapshot_after"):
-        with open(outputs[key], "rb") as f:
-            assert f.read(8) == b"\x89PNG\r\n\x1a\n"
-
-    # Assert PDF magic bytes
-    with open(outputs["export_pdf"], "rb") as f:
-        assert f.read(5) == b"%PDF-"
+    with open(outputs["snapshot_before"], "rb") as handle:
+        assert handle.read(8) == b"\x89PNG\r\n\x1a\n"
+    with open(outputs["snapshot_after"], "rb") as handle:
+        assert handle.read(8) == b"\x89PNG\r\n\x1a\n"
+    with open(outputs["workflow_pdf"], "rb") as handle:
+        assert handle.read(5) == b"%PDF-"
