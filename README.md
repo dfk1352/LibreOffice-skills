@@ -10,13 +10,18 @@ with the UNO API directly.
 
 ## Table of Contents
 
+**Quick start:**
 - [Who This Is For](#who-this-is-for)
-- [Why This Exists](#why-this-exists)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
+
+**A bit more on the details:**
+- [Why This Exists](#why-this-exists)
 - [What's Included](#whats-included)
 - [How It Works](#how-it-works)
 - [Usage Examples](#usage-examples)
+
+**Development & contributing:**
 - [Project Structure](#project-structure)
 - [Development](#development)
 - [Contributing](#contributing)
@@ -25,7 +30,7 @@ with the UNO API directly.
 
 ## Who This Is For
 
-This skill suite targets **AI agents** (Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, and any harness that loads skills from `~/.agents/skills/`) that need to produce or modify real LibreOffice documents as part of their work.
+This skill suite targets **AI agents** that need to produce or modify real LibreOffice documents as part of their work. Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, etc. Any harness that's compatible with skills.
 
 In other words, this skill suite is designed for users who want a well-tested, headless Python library on top of LibreOffice's UNO API, automating LibreOffice operations without building the infrastructure themselves.
 
@@ -43,28 +48,10 @@ Local first, free to use.
 
 ### Installing LibreOffice
 
-**Linux:**
+Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-```bash
-# Debian / Ubuntu
-sudo apt-get install libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress
-
-# Fedora / RHEL
-sudo dnf install libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress
-```
-
-**macOS:**
-
-```bash
-brew install --cask libreoffice
-```
-
-**Windows (and others):**
-
-Or download the installer from the
-[official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
-
-The skill scans common spots to locate `soffice.exe`. For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the `soffice.exe` path.
+The skill scans common spots to locate `soffice.exe`.
+For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the `soffice.exe` path.
 
 ---
 
@@ -121,7 +108,7 @@ export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/pyth
 
 LibreOffice's UNO API is powerful but notoriously difficult. Agents that try to drive it directly spend most of their token budget on error recovery rather than the actual task.
 
-This skill suite aims to solves that by packaging the UNO complexity behind a small, predictable interface:
+This skill suite aims to solve that by packaging the UNO complexity behind a small, predictable interface:
 
 - **Session-based editing** — open a document once, make all your changes through a single live connection, close and save. No per-operation process  spawning overhead, no race conditions.
 - **Patch DSL** — express a multi-step edit plan as a single structured string and get back a machine-readable result. Supports `atomic` mode (all-or-nothing) and `best_effort` mode (apply what you can, report what failed).
@@ -163,11 +150,11 @@ All three skills include the same set of shared modules:
 
 ## How It Works
 
-The central design decision is that each editing session maps to exactly one headless LibreOffice process and one open document. The process is spawned with a unique named pipe and a temporary, isolated user profile that is discarded on exit. Nothing persists between sessions; no global state can accumulate.
+Each editing session maps to exactly one headless LibreOffice process and one open document. The process is spawned with a unique named pipe and a temporary, isolated user profile that is discarded on exit. Nothing persists between sessions; no global state can accumulate.
 
 Within a session, every operation goes through the live UNO connection — text insertions, cell writes, slide manipulations — without reopening the file each time. When the session closes (or its context manager exits), the document is saved and the process is terminated.
 
-The **patch interface** is a higher-level layer on top of sessions. It accepts an INI-style string describing one or more operations, executes them in order against the open document, and returns a `PatchApplyResult` with per-operation status. In `atomic` mode, any failure rolls back all changes and leaves the file untouched. In `best_effort` mode, successful operations are kept and failures are reported individually. This makes patch suitable for agent workflows where the agent generates an edit plan up front and wants to know precisely what succeeded.
+The **patch interface** is a higher-level layer on top of sessions. It accepts an INI-style string describing one or more operations, executes them in order against the open document, and returns a `PatchApplyResult` with per-operation status.
 
 ---
 
