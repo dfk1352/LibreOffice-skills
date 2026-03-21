@@ -1,5 +1,3 @@
-"""Tests for Impress content CRUD through sessions."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -19,19 +17,20 @@ from tests.impress._helpers import (
     get_shape_text,
     get_slide_master_name,
     get_slide_shapes,
+    get_table_matrix,
     get_text_properties,
     open_impress_doc,
 )
 
 
 def test_session_slide_operations_preserve_zero_based_slide_order(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "slides.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.add_slide(layout="BLANK")
         session.add_slide(layout="BLANK")
         session.insert_text_box(
@@ -64,7 +63,7 @@ def test_session_slide_operations_preserve_zero_based_slide_order(tmp_path):
 
 
 def test_session_text_operations_work_for_text_boxes_and_placeholders(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "text_ops.odp"
@@ -74,7 +73,7 @@ def test_session_text_operations_work_for_text_boxes_and_placeholders(tmp_path):
         append_slide(doc, TITLE_AND_CONTENT_LAYOUT)
         doc.store()
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text(
             "Presentation Title",
             ImpressTarget(kind="insertion", slide_index=1, placeholder="title"),
@@ -117,17 +116,17 @@ def test_session_text_operations_work_for_text_boxes_and_placeholders(tmp_path):
 
 def test_session_format_text_applies_character_and_paragraph_formatting(tmp_path):
     from impress import (
+        ImpressSession,
         ImpressTarget,
         ShapePlacement,
         TextFormatting,
-        open_impress_session,
     )
     from impress.core import create_presentation
 
     doc_path = tmp_path / "format_text.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Formatting target",
@@ -158,13 +157,13 @@ def test_session_format_text_applies_character_and_paragraph_formatting(tmp_path
 
 
 def test_session_list_operations_mutate_structural_list_content(tmp_path):
-    from impress import ImpressTarget, ListItem, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ListItem, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "lists.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Action Items",
@@ -184,6 +183,13 @@ def test_session_list_operations_mutate_structural_list_content(tmp_path):
                 after="Action Items",
             ),
         )
+
+    after_insert = get_list_paragraphs(doc_path, 0, name="Agenda Box")
+    insert_texts = [p["text"] for p in after_insert]
+    assert "Confirm scope" in insert_texts
+    assert "Review outputs" in insert_texts
+
+    with ImpressSession(str(doc_path)) as session:
         session.replace_list(
             ImpressTarget(
                 kind="list",
@@ -196,6 +202,13 @@ def test_session_list_operations_mutate_structural_list_content(tmp_path):
                 ListItem(text="Update notes", level=1),
             ],
         )
+
+    after_replace = get_list_paragraphs(doc_path, 0, name="Agenda Box")
+    replace_texts = [p["text"] for p in after_replace]
+    assert "Finalize scope" in replace_texts
+    assert "Confirm scope" not in replace_texts
+
+    with ImpressSession(str(doc_path)) as session:
         session.delete_item(
             ImpressTarget(
                 kind="list",
@@ -211,7 +224,7 @@ def test_session_list_operations_mutate_structural_list_content(tmp_path):
 def test_session_shape_and_image_operations_mutate_slide_inventory_predictably(
     tmp_path,
 ):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "shapes_images.odp"
@@ -219,7 +232,7 @@ def test_session_shape_and_image_operations_mutate_slide_inventory_predictably(
     first_image = create_test_image(tmp_path / "first.png", color="blue")
     replacement_image = create_test_image(tmp_path / "replacement.png", color="green")
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Summary box",
@@ -253,20 +266,46 @@ def test_session_shape_and_image_operations_mutate_slide_inventory_predictably(
     assert any(name.lower() == "summary_box" for name in names)
     assert any(name.lower() == "logo" for name in names)
     assert all(name.lower() != "accent_shape" for name in names)
-    assert get_media_url(doc_path, 0, name="Logo").endswith("replacement.png")
+    assert "replacement" in get_media_url(doc_path, 0, name="Logo")
     geometry = get_shape_geometry(doc_path, 0, name="Logo")
     assert geometry["x"] == 8000
     assert geometry["width"] == 5000
 
 
+def test_session_insert_image_does_not_leak_filesystem_path(tmp_path):
+    """Image Description stores only a filename stem, never the full path."""
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "path_leak.odp"
+    create_presentation(str(doc_path))
+
+    nested_dir = tmp_path / "a" / "b" / "c"
+    nested_dir.mkdir(parents=True)
+    nested_image = create_test_image(nested_dir / "secret_image.png", color="red")
+
+    with ImpressSession(str(doc_path)) as session:
+        session.insert_image(
+            ImpressTarget(kind="slide", slide_index=0),
+            str(nested_image),
+            ShapePlacement(1.0, 1.0, 5.0, 5.0),
+            name="Nested Image",
+        )
+
+    url = get_media_url(doc_path, 0, name="Nested Image")
+    assert "/" not in url, f"Description leaks path separator: {url!r}"
+    assert "\\" not in url, f"Description leaks backslash: {url!r}"
+    assert "file://" not in url, f"Description leaks file URI: {url!r}"
+
+
 def test_session_table_operations_mutate_table_content(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "tables.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_table(
             ImpressTarget(kind="slide", slide_index=0),
             3,
@@ -275,10 +314,22 @@ def test_session_table_operations_mutate_table_content(tmp_path):
             data=[["Label", "Value"], ["Revenue", "100"], ["Cost", "80"]],
             name="Metrics Table",
         )
+
+    after_insert = get_table_matrix(doc_path, 0, name="Metrics Table")
+    assert after_insert[1] == ["Revenue", "100"]
+    assert after_insert[2] == ["Cost", "80"]
+
+    with ImpressSession(str(doc_path)) as session:
         session.update_table(
             ImpressTarget(kind="table", slide_index=0, shape_name="Metrics Table"),
             [["Label", "Value"], ["Revenue", "120"], ["Cost", "90"]],
         )
+
+    after_update = get_table_matrix(doc_path, 0, name="Metrics Table")
+    assert after_update[1] == ["Revenue", "120"]
+    assert after_update[2] == ["Cost", "90"]
+
+    with ImpressSession(str(doc_path)) as session:
         session.delete_item(
             ImpressTarget(kind="table", slide_index=0, shape_name="Metrics Table")
         )
@@ -288,13 +339,13 @@ def test_session_table_operations_mutate_table_content(tmp_path):
 
 
 def test_session_chart_operations_mutate_chart_state_or_presence(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "charts.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_chart(
             ImpressTarget(kind="slide", slide_index=0),
             "bar",
@@ -308,7 +359,7 @@ def test_session_chart_operations_mutate_chart_state_or_presence(tmp_path):
     assert created["title"] == "Revenue Trend"
     assert created["width"] == 10000
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.update_chart(
             ImpressTarget(kind="chart", slide_index=0, shape_name="Revenue Chart"),
             chart_type="line",
@@ -322,7 +373,7 @@ def test_session_chart_operations_mutate_chart_state_or_presence(tmp_path):
     assert updated["x"] == 2000
     assert updated["width"] == 12000
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.delete_item(
             ImpressTarget(kind="chart", slide_index=0, shape_name="Revenue Chart")
         )
@@ -332,7 +383,7 @@ def test_session_chart_operations_mutate_chart_state_or_presence(tmp_path):
 
 
 def test_session_media_operations_mutate_media_objects(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "media.odp"
@@ -340,7 +391,7 @@ def test_session_media_operations_mutate_media_objects(tmp_path):
     first_video = create_test_video(tmp_path / "first.mp4")
     replacement_audio = create_test_audio(tmp_path / "replacement.wav")
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_media(
             ImpressTarget(kind="slide", slide_index=0),
             str(first_video),
@@ -361,13 +412,13 @@ def test_session_media_operations_mutate_media_objects(tmp_path):
 
 
 def test_session_notes_and_master_page_operations_are_persisted(tmp_path):
-    from impress import ImpressTarget, open_impress_session
+    from impress import ImpressSession, ImpressTarget
     from impress.core import create_presentation
 
     doc_path = tmp_path / "notes_master.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.add_slide(layout="BLANK")
         masters = session.list_master_pages()
         session.set_notes(ImpressTarget(kind="notes", slide_index=1), "Speaker note")
@@ -389,7 +440,7 @@ def test_session_notes_and_master_page_operations_are_persisted(tmp_path):
 
 
 def test_session_export_writes_alternate_presentation_formats(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "export_session.odp"
@@ -397,7 +448,7 @@ def test_session_export_writes_alternate_presentation_formats(tmp_path):
     pptx_path = tmp_path / "export_session.pptx"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Export me",

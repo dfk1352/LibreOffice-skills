@@ -1,5 +1,3 @@
-"""Tests for applying Impress patches."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations

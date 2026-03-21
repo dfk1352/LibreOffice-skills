@@ -1,5 +1,3 @@
-"""Tests for Writer session lifecycle behaviour."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -9,56 +7,120 @@ import pytest
 from tests.writer._helpers import create_test_image
 
 
-def test_open_writer_session_returns_session(tmp_path):
-    from writer import WriterSession, open_writer_session
+@pytest.fixture(scope="module")
+def closed_writer_session(tmp_path_factory):
+    """A WriterSession that has been opened and immediately closed.
+
+    Module-scoped so a single LibreOffice round-trip is shared across all
+    parametrized ``test_closed_session_methods_raise_writer_session_error``
+    variants. Each variant only checks that calling a method on the
+    already-closed session raises ``WriterSessionError`` -- no UNO access
+    is needed for that assertion.
+
+    Returns a ``(session, tmp_path)`` tuple so parametrized lambdas that
+    reference file paths still work.
+    """
+    from writer import WriterSession
+    from writer.core import create_document
+
+    base = tmp_path_factory.mktemp("closed_writer")
+    doc_path = base / "closed.odt"
+    create_document(str(doc_path))
+
+    session = WriterSession(str(doc_path))
+    session.close()
+    return session, base
+
+
+def test_writer_session_returns_session(tmp_path):
+    from writer import WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "session.odt"
     create_document(str(doc_path))
 
-    session = open_writer_session(str(doc_path))
+    session = WriterSession(str(doc_path))
     try:
         assert isinstance(session, WriterSession)
     finally:
         session.close()
 
 
-def test_open_writer_session_missing_path_raises(tmp_path):
-    from writer import open_writer_session
+def test_writer_session_missing_path_raises(tmp_path):
+    from writer import WriterSession
     from writer.exceptions import DocumentNotFoundError
 
     with pytest.raises(DocumentNotFoundError):
-        open_writer_session(str(tmp_path / "missing.odt"))
+        WriterSession(str(tmp_path / "missing.odt"))
 
 
 def test_session_close_save_true_persists_changes(tmp_path):
-    from writer import open_writer_session
+    from writer import WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "persist.odt"
     create_document(str(doc_path))
 
-    session = open_writer_session(str(doc_path))
+    session = WriterSession(str(doc_path))
     session.insert_text("Saved once")
     session.close(save=True)
 
-    with open_writer_session(str(doc_path)) as reopened:
+    with WriterSession(str(doc_path)) as reopened:
         assert reopened.read_text() == "Saved once"
 
 
 def test_session_close_save_false_discards_changes(tmp_path):
-    from writer import open_writer_session
+    from writer import WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "discard.odt"
     create_document(str(doc_path))
 
-    session = open_writer_session(str(doc_path))
+    session = WriterSession(str(doc_path))
     session.insert_text("Discard me")
     session.close(save=False)
 
-    with open_writer_session(str(doc_path)) as reopened:
+    with WriterSession(str(doc_path)) as reopened:
         assert reopened.read_text() == ""
+
+
+def test_session_restore_snapshot_reverts_to_original_content(tmp_path):
+    from writer import WriterSession
+    from writer.core import create_document
+
+    doc_path = tmp_path / "restore.odt"
+    create_document(str(doc_path))
+
+    original_bytes = doc_path.read_bytes()
+
+    session = WriterSession(str(doc_path))
+    session.insert_text("Temporary content that should be reverted")
+    session.restore_snapshot(original_bytes)
+    assert session.read_text() == ""
+    session.close(save=False)
+
+
+def test_session_restore_snapshot_marks_closed_on_reopen_failure(tmp_path):
+    from unittest.mock import patch as mock_patch
+
+    from writer import WriterSession
+    from writer.core import create_document
+    from writer.exceptions import WriterSessionError
+
+    doc_path = tmp_path / "restore_fail.odt"
+    create_document(str(doc_path))
+
+    original_bytes = doc_path.read_bytes()
+    session = WriterSession(str(doc_path))
+
+    with mock_patch.object(
+        WriterSession, "_open_document", side_effect=RuntimeError("simulated failure")
+    ):
+        with pytest.raises(RuntimeError, match="simulated failure"):
+            session.restore_snapshot(original_bytes)
+
+    with pytest.raises(WriterSessionError):
+        session.read_text()
 
 
 @pytest.mark.parametrize(
@@ -150,57 +212,53 @@ def test_session_close_save_false_discards_changes(tmp_path):
     ],
 )
 def test_closed_session_methods_raise_writer_session_error(
-    tmp_path,
+    closed_writer_session,
     label,
     call,
 ):
-    from writer import open_writer_session
-    from writer.core import create_document
     from writer.exceptions import WriterSessionError
 
-    doc_path = tmp_path / f"closed_{label}.odt"
-    image_path = create_test_image(tmp_path / f"{label}.png")
-    create_document(str(doc_path))
-
-    session = open_writer_session(str(doc_path))
-    session.close()
+    session, base_tmp = closed_writer_session
+    image_path = base_tmp / f"{label}.png"
+    if not image_path.exists():
+        create_test_image(image_path)
 
     with pytest.raises(WriterSessionError):
         call(session, image_path)
 
 
 def test_session_close_twice_raises_writer_session_error(tmp_path):
-    from writer import open_writer_session
+    from writer import WriterSession
     from writer.core import create_document
     from writer.exceptions import WriterSessionError
 
     doc_path = tmp_path / "double_close.odt"
     create_document(str(doc_path))
 
-    session = open_writer_session(str(doc_path))
+    session = WriterSession(str(doc_path))
     session.close()
 
     with pytest.raises(WriterSessionError):
         session.close()
 
 
-def test_open_writer_session_context_manager_closes_after_block(tmp_path):
-    from writer import open_writer_session
+def test_writer_session_context_manager_closes_after_block(tmp_path):
+    from writer import WriterSession
     from writer.core import create_document
     from writer.exceptions import WriterSessionError
 
     doc_path = tmp_path / "context.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text("context managed")
 
     with pytest.raises(WriterSessionError):
         session.read_text()
 
 
-def test_open_writer_session_context_manager_closes_on_exception(tmp_path):
-    from writer import open_writer_session
+def test_writer_session_context_manager_closes_on_exception(tmp_path):
+    from writer import WriterSession
     from writer.core import create_document
     from writer.exceptions import WriterSessionError
 
@@ -210,7 +268,7 @@ def test_open_writer_session_context_manager_closes_on_exception(tmp_path):
     session = None
 
     with pytest.raises(RuntimeError):
-        with open_writer_session(str(doc_path)) as managed_session:
+        with WriterSession(str(doc_path)) as managed_session:
             session = managed_session
             managed_session.insert_text("before boom")
             raise RuntimeError("boom")

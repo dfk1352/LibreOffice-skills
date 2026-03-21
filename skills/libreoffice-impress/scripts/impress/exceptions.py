@@ -1,6 +1,6 @@
 """Custom exceptions for the Impress skill."""
 
-from exceptions import SessionClosedError, UnoBridgeError
+from exceptions import SessionClosedError
 
 
 class ImpressSkillError(Exception):
@@ -67,6 +67,14 @@ class MasterNotFoundError(TargetNoMatchError):
     """Compatibility error when a master page name is not found."""
 
 
+class SnapshotError(ImpressSkillError):
+    """Base error for snapshot operations."""
+
+
+class FilterError(SnapshotError):
+    """Error when PNG export filter fails."""
+
+
 __all__ = [
     "ImpressSkillError",
     "ImpressSessionError",
@@ -84,6 +92,7 @@ __all__ = [
     "InvalidLayoutError",
     "InvalidShapeError",
     "MasterNotFoundError",
-    "UnoBridgeError",
+    "SnapshotError",
+    "FilterError",
     "SessionClosedError",
 ]

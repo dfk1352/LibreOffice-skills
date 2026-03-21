@@ -1,5 +1,3 @@
-"""Integration workflow tests for Calc session-first workflows."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -18,11 +16,11 @@ from tests.calc._helpers import (
 def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     """Build Calc workflow artifacts that exercise every public Calc tool."""
     from calc import (
+        CalcSession,
         CalcTarget,
         CellFormatting,
         ChartSpec,
         ValidationRule,
-        open_calc_session,
         patch,
         snapshot_area,
     )
@@ -33,7 +31,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     session_doc = output_dir / "session_workflow.ods"
     create_spreadsheet(str(session_doc))
 
-    session = open_calc_session(str(session_doc))
+    session = CalcSession(str(session_doc))
     session.write_cell(
         CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
         "Workflow Seed",
@@ -180,7 +178,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         height=500,
     )
 
-    session = open_calc_session(str(session_doc))
+    session = CalcSession(str(session_doc))
     session.write_range(
         CalcTarget(
             kind="range",
@@ -223,7 +221,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     )
     session.close()
 
-    with open_calc_session(str(session_doc)) as session:
+    with CalcSession(str(session_doc)) as session:
         session.format_range(
             CalcTarget(
                 kind="range", sheet="Revenue Data", row=0, col=0, end_row=0, end_col=1
@@ -284,7 +282,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     atomic_doc = output_dir / "patch_atomic.ods"
     create_spreadsheet(str(atomic_doc))
-    with open_calc_session(str(atomic_doc)) as session:
+    with CalcSession(str(atomic_doc)) as session:
         session.write_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
             "Atomic baseline",
@@ -319,7 +317,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     best_effort_doc = output_dir / "patch_best_effort.ods"
     create_spreadsheet(str(best_effort_doc))
-    with open_calc_session(str(best_effort_doc)) as session:
+    with CalcSession(str(best_effort_doc)) as session:
         session.write_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
             "Best effort baseline",
@@ -363,11 +361,11 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
 def test_session_workflow_document_state(tmp_path):
     """Session workflow leaves visible session-first Calc state behind."""
-    from calc import CalcTarget, open_calc_session
+    from calc import CalcTarget, CalcSession
 
     outputs = run_calc_end_to_end_workflow(tmp_path)
 
-    with open_calc_session(str(outputs["session_workflow"])) as session:
+    with CalcSession(str(outputs["session_workflow"])) as session:
         sheets = session.list_sheets()
         total = session.read_cell(
             CalcTarget(kind="cell", sheet="Revenue Data", row=4, col=1)
@@ -433,11 +431,11 @@ def test_session_workflow_document_state(tmp_path):
 
 def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_path):
     """Standalone patch workflow preserves atomic and best-effort semantics."""
-    from calc import CalcTarget, open_calc_session
+    from calc import CalcTarget, CalcSession
 
     outputs = run_calc_end_to_end_workflow(tmp_path)
 
-    with open_calc_session(str(outputs["patch_atomic"])) as session:
+    with CalcSession(str(outputs["patch_atomic"])) as session:
         atomic_baseline = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
         )
@@ -445,7 +443,7 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
             CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
         )
 
-    with open_calc_session(str(outputs["patch_best_effort"])) as session:
+    with CalcSession(str(outputs["patch_best_effort"])) as session:
         best_effort_first = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
         )

@@ -1,17 +1,17 @@
 """Session-based editing API for Writer documents."""
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any
 
 from colors import resolve_color
+from constants import ALIGNMENT_MAP
 from session import BaseSession
 from uno_bridge import uno_context
 from writer.core import EXPORT_FILTERS
 from writer.exceptions import (
     DocumentNotFoundError,
     ImageNotFoundError,
+    InvalidMetadataError,
     WriterSessionError,
     WriterSkillError,
 )
@@ -38,12 +38,7 @@ _ITALIC_POSTURE = 2
 _NORMAL_POSTURE = 0
 _SINGLE_UNDERLINE = 1
 _NO_UNDERLINE = 0
-_ALIGNMENT_MAP = {
-    "left": 0,
-    "right": 1,
-    "center": 2,
-    "justify": 3,
-}
+_ALIGNMENT_MAP = ALIGNMENT_MAP
 _ORDERED_LIST_STYLE = "Numbering 123"
 _UNORDERED_LIST_STYLE = "List 1"
 
@@ -85,28 +80,28 @@ class WriterSession(BaseSession):
     def read_text(self, target: WriterTarget | None = None) -> str:
         self._require_open()
         if target is None:
-            return self.doc.Text.getString()
-        return resolve_text_range(target, self.doc).getString()
+            return self._doc.Text.getString()
+        return resolve_text_range(target, self._doc).getString()
 
     def insert_text(self, text: str, target: WriterTarget | None = None) -> None:
         self._require_open()
-        cursor = resolve_insertion_point(target, self.doc)
-        _insert_string(self.doc.Text, cursor, text)
+        cursor = resolve_insertion_point(target, self._doc)
+        _insert_string(self._doc.Text, cursor, text)
 
     def replace_text(self, target: WriterTarget, new_text: str) -> None:
         self._require_open()
-        match = resolve_text_range(target, self.doc)
+        match = resolve_text_range(target, self._doc)
         match.setString(new_text)
 
     def delete_text(self, target: WriterTarget) -> None:
         self._require_open()
-        match = resolve_text_range(target, self.doc)
+        match = resolve_text_range(target, self._doc)
         match.setString("")
 
     def format_text(self, target: WriterTarget, formatting: TextFormatting) -> None:
         self._require_open()
         validate_formatting(formatting)
-        text_range = resolve_text_range(target, self.doc)
+        text_range = resolve_text_range(target, self._doc)
         _apply_formatting(text_range, formatting)
 
     def insert_table(
@@ -120,11 +115,11 @@ class WriterSession(BaseSession):
         self._require_open()
         validate_table_data(rows, cols, data)
 
-        table = self.doc.createInstance("com.sun.star.text.TextTable")
+        table = self._doc.createInstance("com.sun.star.text.TextTable")
         table.initialize(rows, cols)
 
-        cursor = resolve_insertion_point(target, self.doc)
-        self.doc.Text.insertTextContent(cursor, table, False)
+        cursor = resolve_insertion_point(target, self._doc)
+        self._doc.Text.insertTextContent(cursor, table, False)
         if name is not None:
             _assign_content_name(table, name)
 
@@ -133,7 +128,7 @@ class WriterSession(BaseSession):
 
     def update_table(self, target: WriterTarget, data: list[list[Any]]) -> None:
         self._require_open()
-        table = resolve_table_target(target, self.doc)
+        table = resolve_table_target(target, self._doc)
         rows = table.Rows.Count
         cols = table.Columns.Count
         validate_table_data(rows, cols, data)
@@ -141,9 +136,9 @@ class WriterSession(BaseSession):
 
     def delete_table(self, target: WriterTarget) -> None:
         self._require_open()
-        table = resolve_table_target(target, self.doc)
+        table = resolve_table_target(target, self._doc)
         try:
-            self.doc.Text.removeTextContent(table)
+            self._doc.Text.removeTextContent(table)
         except Exception:
             table.dispose()
 
@@ -160,13 +155,13 @@ class WriterSession(BaseSession):
         if not image_file.exists():
             raise ImageNotFoundError(f"Image not found: {image_path}")
 
-        graphic = self.doc.createInstance("com.sun.star.text.GraphicObject")
+        graphic = self._doc.createInstance("com.sun.star.text.GraphicObject")
         graphic.GraphicURL = image_file.resolve().as_uri()
         if width is not None or height is not None:
             _set_graphic_size(graphic, width, height)
 
-        cursor = resolve_insertion_point(target, self.doc)
-        self.doc.Text.insertTextContent(cursor, graphic, False)
+        cursor = resolve_insertion_point(target, self._doc)
+        self._doc.Text.insertTextContent(cursor, graphic, False)
         if name is not None:
             _assign_content_name(graphic, name)
 
@@ -180,7 +175,7 @@ class WriterSession(BaseSession):
         self._require_open()
         validate_image_update(image_path, width, height)
 
-        graphic = resolve_image_target(target, self.doc)
+        graphic = resolve_image_target(target, self._doc)
         if image_path is not None:
             image_file = Path(image_path)
             if not image_file.exists():
@@ -191,9 +186,9 @@ class WriterSession(BaseSession):
 
     def delete_image(self, target: WriterTarget) -> None:
         self._require_open()
-        graphic = resolve_image_target(target, self.doc)
+        graphic = resolve_image_target(target, self._doc)
         try:
-            self.doc.Text.removeTextContent(graphic)
+            self._doc.Text.removeTextContent(graphic)
         except Exception:
             graphic.dispose()
 
@@ -205,12 +200,12 @@ class WriterSession(BaseSession):
     ) -> None:
         self._require_open()
         validate_list_items(items)
-        cursor = resolve_insertion_point(target, self.doc)
+        cursor = resolve_insertion_point(target, self._doc)
         if target is not None and target.after is not None and target.before is None:
             cursor, following_list = _advance_cursor_past_following_list(cursor)
             if following_list:
                 _apply_list_style_to_paragraphs(following_list, ordered)
-        _insert_list_at_cursor(self.doc.Text, cursor, items, ordered)
+        _insert_list_at_cursor(self._doc.Text, cursor, items, ordered)
 
     def replace_list(
         self,
@@ -220,17 +215,66 @@ class WriterSession(BaseSession):
     ) -> None:
         self._require_open()
         validate_list_items(items)
-        paragraphs = resolve_list_target(target, self.doc)
+        paragraphs = resolve_list_target(target, self._doc)
         ordered_value = ordered
         if ordered_value is None:
             ordered_value = _paragraphs_are_ordered(paragraphs)
-        anchor = _delete_paragraph_block(self.doc, paragraphs)
-        _insert_list_at_cursor(self.doc.Text, anchor, items, ordered_value)
+        anchor = _delete_paragraph_block(self._doc, paragraphs)
+        _insert_list_at_cursor(self._doc.Text, anchor, items, ordered_value)
 
     def delete_list(self, target: WriterTarget) -> None:
         self._require_open()
-        paragraphs = resolve_list_target(target, self.doc)
-        _delete_paragraph_block(self.doc, paragraphs)
+        paragraphs = resolve_list_target(target, self._doc)
+        _delete_paragraph_block(self._doc, paragraphs)
+
+    def set_metadata(self, values: dict[str, str]) -> None:
+        """Set metadata properties on the open document.
+
+        Args:
+            values: Dictionary of metadata key-value pairs.
+                Supported keys: title, author, subject, keywords, description.
+
+        Raises:
+            InvalidMetadataError: If any key is empty.
+        """
+        self._require_open()
+        if any(not key for key in values):
+            raise InvalidMetadataError("Metadata keys must be non-empty")
+
+        doc_info = self._doc.getDocumentProperties()
+
+        if "title" in values:
+            doc_info.Title = values["title"]
+        if "author" in values:
+            doc_info.Author = values["author"]
+        if "subject" in values:
+            doc_info.Subject = values["subject"]
+        if "keywords" in values:
+            keywords = values["keywords"]
+            if isinstance(keywords, str):
+                keyword_list = [k.strip() for k in keywords.split(",")]
+                doc_info.Keywords = tuple(keyword_list)
+            else:
+                doc_info.Keywords = tuple(keywords)
+        if "description" in values:
+            doc_info.Description = values["description"]
+
+    def get_metadata(self) -> dict[str, str]:
+        """Read metadata properties from the open document.
+
+        Returns:
+            Dictionary with keys: title, author, subject, keywords,
+            description.
+        """
+        self._require_open()
+        doc_info = self._doc.getDocumentProperties()
+        return {
+            "title": doc_info.Title or "",
+            "author": doc_info.Author or "",
+            "subject": doc_info.Subject or "",
+            "keywords": ", ".join(doc_info.Keywords) or "",
+            "description": doc_info.Description or "",
+        }
 
     def patch(self, patch_text: str, mode: PatchApplyMode = "atomic"):
         self._require_open()
@@ -238,11 +282,11 @@ class WriterSession(BaseSession):
 
         return apply_operations(self, patch_text, mode)
 
-    def export(self, output_path: str, format: str) -> None:
+    def export(self, output_path: str, export_format: str) -> None:
         """Export the current document state to another Writer-supported format."""
         self._require_open()
-        if format not in EXPORT_FILTERS:
-            raise WriterSkillError(f"Unsupported export format: {format}")
+        if export_format not in EXPORT_FILTERS:
+            raise WriterSkillError(f"Unsupported export format: {export_format}")
 
         output = Path(output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -251,15 +295,31 @@ class WriterSession(BaseSession):
 
         filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
         filter_prop.Name = "FilterName"
-        filter_prop.Value = EXPORT_FILTERS[format]
-        self.doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
+        filter_prop.Value = EXPORT_FILTERS[export_format]
+        self._doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
 
     def reset(self) -> None:
         """Discard in-memory changes and reopen the backing document."""
         self._require_open()
         self._doc.close(False)
         self._uno_manager.__exit__(None, None, None)
-        self._open_document()
+        try:
+            self._open_document()
+        except Exception:
+            self._closed = True
+            raise
+
+    def restore_snapshot(self, snapshot: bytes) -> None:
+        """Close the document, overwrite the file, and reopen."""
+        self._require_open()
+        self._doc.close(False)
+        self._uno_manager.__exit__(None, None, None)
+        self._path.write_bytes(snapshot)
+        try:
+            self._open_document()
+        except Exception:
+            self._closed = True
+            raise
 
     def _open_document(self) -> None:
         self._uno_manager = uno_context()
@@ -278,11 +338,6 @@ class WriterSession(BaseSession):
             raise WriterSkillError(
                 f"Failed to open Writer document: {self._path}"
             ) from exc
-
-
-def open_writer_session(path: str) -> WriterSession:
-    """Open a Writer editing session for an existing document."""
-    return WriterSession(path)
 
 
 def _insert_string(text_obj: Any, cursor: Any, text: str) -> None:

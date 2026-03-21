@@ -1,5 +1,3 @@
-"""Tests for Writer target parsing and resolution."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -10,11 +8,11 @@ from tests.writer._helpers import create_test_image, get_list_paragraphs, open_u
 
 
 def _create_target_fixture_document(doc_path, image_path):
-    from writer import ListItem, WriterTarget, open_writer_session
+    from writer import ListItem, WriterTarget, WriterSession
     from writer.core import create_document
 
     create_document(str(doc_path))
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text(
             "Overview\n\n"
             "Financial Summary\n\n"

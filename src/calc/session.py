@@ -2,8 +2,6 @@
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, cast
 
@@ -76,11 +74,27 @@ class CalcSession(BaseSession):
         self._require_open()
         self._doc.close(False)
         self._uno_manager.__exit__(None, None, None)
-        self._open_document()
+        try:
+            self._open_document()
+        except Exception:
+            self._closed = True
+            raise
+
+    def restore_snapshot(self, snapshot: bytes) -> None:
+        """Close the document, overwrite the file, and reopen."""
+        self._require_open()
+        self._doc.close(False)
+        self._uno_manager.__exit__(None, None, None)
+        self._path.write_bytes(snapshot)
+        try:
+            self._open_document()
+        except Exception:
+            self._closed = True
+            raise
 
     def read_cell(self, target: CalcTarget) -> dict[str, object]:
         self._require_open()
-        return _cell_result(resolve_cell_target(target, self.doc))
+        return _cell_result(resolve_cell_target(target, self._doc))
 
     def write_cell(
         self,
@@ -89,7 +103,7 @@ class CalcSession(BaseSession):
         value_type: str = "auto",
     ) -> None:
         self._require_open()
-        cell = resolve_cell_target(target, self.doc)
+        cell = resolve_cell_target(target, self._doc)
         normalized_type = value_type.strip().lower()
         if normalized_type == "formula":
             cell.Formula = str(value)
@@ -115,7 +129,7 @@ class CalcSession(BaseSession):
 
     def read_range(self, target: CalcTarget) -> list[list[dict[str, object]]]:
         self._require_open()
-        cell_range = resolve_range_target(target, self.doc)
+        cell_range = resolve_range_target(target, self._doc)
         address = cell_range.getRangeAddress()
         rows: list[list[dict[str, object]]] = []
         for row in range(address.StartRow, address.EndRow + 1):
@@ -133,7 +147,7 @@ class CalcSession(BaseSession):
 
     def write_range(self, target: CalcTarget, data: list[list[object]]) -> None:
         self._require_open()
-        cell_range = resolve_range_target(target, self.doc)
+        cell_range = resolve_range_target(target, self._doc)
         address = cell_range.getRangeAddress()
         expected_rows = address.EndRow - address.StartRow + 1
         expected_cols = address.EndColumn - address.StartColumn + 1
@@ -161,16 +175,16 @@ class CalcSession(BaseSession):
         self._require_open()
         validate_formatting(formatting)
         if target.kind == "cell":
-            resolved = resolve_cell_target(target, self.doc)
+            resolved = resolve_cell_target(target, self._doc)
         else:
-            resolved = resolve_range_target(target, self.doc)
-        _apply_formatting(self.doc, resolved, formatting)
+            resolved = resolve_range_target(target, self._doc)
+        _apply_formatting(self._doc, resolved, formatting)
 
     def list_sheets(self) -> list[dict[str, object]]:
         self._require_open()
         sheets = []
-        for index in range(self.doc.Sheets.getCount()):
-            sheet = self.doc.Sheets.getByIndex(index)
+        for index in range(self._doc.Sheets.getCount()):
+            sheet = self._doc.Sheets.getByIndex(index)
             sheets.append(
                 {"name": sheet.Name, "index": index, "visible": bool(sheet.IsVisible)}
             )
@@ -180,47 +194,47 @@ class CalcSession(BaseSession):
         self._require_open()
         if not name.strip():
             raise InvalidPayloadError("Sheet name cannot be empty")
-        insert_index = self.doc.Sheets.getCount() if index is None else index
-        self.doc.Sheets.insertNewByName(name, insert_index)
+        insert_index = self._doc.Sheets.getCount() if index is None else index
+        self._doc.Sheets.insertNewByName(name, insert_index)
 
     def rename_sheet(self, target: CalcTarget, new_name: str) -> None:
         self._require_open()
         if not new_name.strip():
             raise InvalidPayloadError("new_name cannot be empty")
-        sheet = resolve_sheet_target(target, self.doc)
+        sheet = resolve_sheet_target(target, self._doc)
         sheet.Name = new_name
 
     def delete_sheet(self, target: CalcTarget) -> None:
         self._require_open()
-        sheet = resolve_sheet_target(target, self.doc)
-        self.doc.Sheets.removeByName(sheet.Name)
+        sheet = resolve_sheet_target(target, self._doc)
+        self._doc.Sheets.removeByName(sheet.Name)
 
     def define_named_range(self, name: str, target: CalcTarget) -> None:
         self._require_open()
         if not name.strip():
             raise InvalidPayloadError("Named range name cannot be empty")
-        cell_range = resolve_range_target(target, self.doc)
+        cell_range = resolve_range_target(target, self._doc)
         base_address = cell_range.getCellByPosition(0, 0).getCellAddress()
-        if self.doc.NamedRanges.hasByName(name):
-            self.doc.NamedRanges.removeByName(name)
-        self.doc.NamedRanges.addNewByName(
+        if self._doc.NamedRanges.hasByName(name):
+            self._doc.NamedRanges.removeByName(name)
+        self._doc.NamedRanges.addNewByName(
             name, cell_range.AbsoluteName, base_address, 0
         )
 
     def get_named_range(self, target: CalcTarget) -> dict[str, object]:
         self._require_open()
-        named_range = resolve_named_range_target(target, self.doc)
+        named_range = resolve_named_range_target(target, self._doc)
         return {"name": target.name, "formula": named_range.Content}
 
     def delete_named_range(self, target: CalcTarget) -> None:
         self._require_open()
-        named_range = resolve_named_range_target(target, self.doc)
-        self.doc.NamedRanges.removeByName(named_range.Name)
+        named_range = resolve_named_range_target(target, self._doc)
+        self._doc.NamedRanges.removeByName(named_range.Name)
 
     def set_validation(self, target: CalcTarget, rule: ValidationRule) -> None:
         self._require_open()
         validate_validation_rule(rule)
-        cell_range = resolve_range_target(target, self.doc)
+        cell_range = resolve_range_target(target, self._doc)
 
         import uno
 
@@ -243,7 +257,7 @@ class CalcSession(BaseSession):
 
     def clear_validation(self, target: CalcTarget) -> None:
         self._require_open()
-        cell_range = resolve_range_target(target, self.doc)
+        cell_range = resolve_range_target(target, self._doc)
         validation = cell_range.Validation
         validation.Type = 0
         validation.setFormula1("")
@@ -260,8 +274,8 @@ class CalcSession(BaseSession):
     def create_chart(self, target: CalcTarget, spec: ChartSpec) -> None:
         self._require_open()
         validate_chart_spec(spec)
-        sheet = resolve_sheet_target(target, self.doc)
-        data_range = resolve_range_target(spec.data_range, self.doc)
+        sheet = resolve_sheet_target(target, self._doc)
+        data_range = resolve_range_target(spec.data_range, self._doc)
         charts = sheet.Charts
         base_name = spec.title or "Chart"
         chart_name = base_name
@@ -289,15 +303,15 @@ class CalcSession(BaseSession):
     def update_chart(self, target: CalcTarget, spec: ChartSpec) -> None:
         self._require_open()
         validate_chart_spec(spec)
-        table_chart = resolve_chart_target(target, self.doc)
-        data_range = resolve_range_target(spec.data_range, self.doc)
+        table_chart = resolve_chart_target(target, self._doc)
+        data_range = resolve_range_target(spec.data_range, self._doc)
         sheet = resolve_sheet_target(
             CalcTarget(
                 kind="sheet",
                 sheet=spec.data_range.sheet,
                 sheet_index=spec.data_range.sheet_index,
             ),
-            self.doc,
+            self._doc,
         )
         rectangle = _rectangle_from_anchor(
             sheet,
@@ -322,23 +336,23 @@ class CalcSession(BaseSession):
 
     def delete_chart(self, target: CalcTarget) -> None:
         self._require_open()
-        table_chart = resolve_chart_target(target, self.doc)
+        table_chart = resolve_chart_target(target, self._doc)
         sheet = resolve_sheet_target(
             CalcTarget(
                 kind="sheet", sheet=target.sheet, sheet_index=target.sheet_index
             ),
-            self.doc,
+            self._doc,
         )
         sheet.Charts.removeByName(table_chart.Name)
 
     def recalculate(self) -> None:
         self._require_open()
-        self.doc.calculate()
+        self._doc.calculate()
 
-    def export(self, output_path: str, format: str) -> None:
+    def export(self, output_path: str, export_format: str) -> None:
         self._require_open()
-        if format not in EXPORT_FILTERS:
-            raise InvalidPayloadError(f"Unsupported export format: {format}")
+        if export_format not in EXPORT_FILTERS:
+            raise CalcSessionError(f"Unsupported export format: {export_format}")
 
         output = Path(output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -347,8 +361,8 @@ class CalcSession(BaseSession):
 
         filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
         filter_prop.Name = "FilterName"
-        filter_prop.Value = EXPORT_FILTERS[format]
-        self.doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
+        filter_prop.Value = EXPORT_FILTERS[export_format]
+        self._doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
 
     def patch(self, patch_text: str, mode: PatchApplyMode = "atomic"):
         self._require_open()
@@ -375,11 +389,6 @@ class CalcSession(BaseSession):
             ) from exc
 
 
-def open_calc_session(path: str) -> CalcSession:
-    """Open a Calc editing session for an existing spreadsheet."""
-    return CalcSession(path)
-
-
 FORMULA_ERRORS = {"#DIV/0!", "#REF!", "#VALUE!", "#NAME?", "#N/A"}
 
 
@@ -396,7 +405,9 @@ def _cell_result(cell: Any) -> dict[str, object]:
             "type": "formula",
             "raw": raw,
         }
-    if cell.Type.value == "TEXT" or cell.Type.value == 2:
+    # UNO CellContentType.TEXT has int value 2, but older PyUNO builds
+    # may return the string "TEXT" from .value; check both for safety.
+    if cell.Type.value in (2, "TEXT"):
         return {
             "value": cell.String,
             "formula": None,

@@ -1,5 +1,3 @@
-"""Test basic package imports."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 
@@ -12,11 +10,10 @@ def test_imports_writer_package():
     assert callable(writer.export_document)
     assert hasattr(writer, "snapshot_page")
     assert callable(writer.snapshot_page)
-    assert hasattr(writer, "open_writer_session")
-    assert callable(writer.open_writer_session)
+    assert hasattr(writer, "WriterSession")
+    assert callable(writer.WriterSession)
     assert hasattr(writer, "patch")
     assert callable(writer.patch)
-    assert hasattr(writer, "WriterSession")
     assert hasattr(writer, "WriterTarget")
     assert hasattr(writer, "TextFormatting")
     assert hasattr(writer, "ListItem")

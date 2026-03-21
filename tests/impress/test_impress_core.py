@@ -1,5 +1,3 @@
-"""Tests for standalone Impress presentation lifecycle helpers."""
-
 # pyright: reportMissingImports=false
 
 from __future__ import annotations
@@ -36,14 +34,14 @@ def test_export_presentation_missing_doc_raises(tmp_path):
 
 
 def test_export_presentation_pdf(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation, export_presentation
 
     path = tmp_path / "export_pdf.odp"
     output = tmp_path / "export_pdf.pdf"
     create_presentation(str(path))
 
-    with open_impress_session(str(path)) as session:
+    with ImpressSession(str(path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Export me",

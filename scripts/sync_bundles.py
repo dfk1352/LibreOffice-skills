@@ -16,6 +16,7 @@ SHARED_FILES = [
     "exceptions.py",
     "colors.py",
     "session.py",
+    "constants.py",
 ]
 
 SKILL_SUBPACKAGE: dict[str, str] = {
@@ -48,6 +49,8 @@ def sync_bundle(src_root: Path, skill_dir: Path, subpackage: str) -> None:
 
     for src_file in src_sub.rglob("*"):
         if src_file.is_dir():
+            continue
+        if "__pycache__" in src_file.parts:
             continue
         rel = src_file.relative_to(src_root)
         _copy_file(src_file, dest_root / rel)

@@ -7,7 +7,7 @@ from impress.patch import (
     PatchOperationResult,
     patch,
 )
-from impress.session import ImpressSession, open_impress_session
+from impress.session import ImpressSession
 from impress.snapshot import snapshot_slide
 from impress.targets import (
     ImpressTarget,
@@ -28,7 +28,6 @@ __all__ = [
     "create_presentation",
     "export_presentation",
     "get_slide_count",
-    "open_impress_session",
     "patch",
     "snapshot_slide",
 ]

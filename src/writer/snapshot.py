@@ -1,26 +1,14 @@
 """Writer snapshot module for page-level PNG export."""
 
-import struct
 from dataclasses import dataclass
 from pathlib import Path
 
 from uno_bridge import uno_context
 from writer.exceptions import (
     DocumentNotFoundError,
-    WriterSkillError,
+    FilterError,
+    InvalidPageError,
 )
-
-
-class SnapshotError(WriterSkillError):
-    """Base error for snapshot operations."""
-
-
-class InvalidPageError(SnapshotError):
-    """Error when page number is out of bounds."""
-
-
-class FilterError(SnapshotError):
-    """Error when PNG export filter fails."""
 
 
 @dataclass
@@ -135,7 +123,7 @@ def snapshot_page(
 
 
 def _read_png_dimensions(path: Path) -> tuple[int, int]:
-    """Read width and height from a PNG file's IHDR chunk.
+    """Read width and height from a PNG file.
 
     Args:
         path: Path to the PNG file.
@@ -143,9 +131,15 @@ def _read_png_dimensions(path: Path) -> tuple[int, int]:
     Returns:
         Tuple of (width, height) in pixels.
     """
-    with open(path, "rb") as f:
-        f.read(8)  # PNG signature
-        f.read(4)  # IHDR chunk length
-        f.read(4)  # IHDR chunk type
-        w, h = struct.unpack(">II", f.read(8))
-    return w, h
+    try:
+        from PIL import Image
+
+        with Image.open(path) as img:
+            return img.size
+    except ImportError:
+        import struct
+
+        with open(path, "rb") as f:
+            f.read(16)
+            w, h = struct.unpack(">II", f.read(8))
+        return w, h

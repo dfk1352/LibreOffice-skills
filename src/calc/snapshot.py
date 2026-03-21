@@ -2,28 +2,16 @@
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
-import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from calc.exceptions import CalcSkillError, DocumentNotFoundError
+from calc.exceptions import (
+    DocumentNotFoundError,
+    FilterError,
+    InvalidAreaError,
+    InvalidSheetError,
+)
 from uno_bridge import uno_context
-
-
-class SnapshotError(CalcSkillError):
-    """Base error for snapshot operations."""
-
-
-class InvalidSheetError(SnapshotError):
-    """Error when sheet name does not exist."""
-
-
-class InvalidAreaError(SnapshotError):
-    """Error when area coordinates are invalid."""
-
-
-class FilterError(SnapshotError):
-    """Error when PNG export filter fails."""
 
 
 @dataclass
@@ -97,7 +85,6 @@ def snapshot_area(
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
         try:
-            # Validate sheet exists
             sheets = doc.Sheets
             if not sheets.hasByName(sheet):
                 available = [sheets.getByIndex(i).Name for i in range(sheets.Count)]
@@ -109,26 +96,18 @@ def snapshot_area(
             controller = doc.getCurrentController()
             controller.setActiveSheet(sheet_obj)
 
-            # Build cell range for Selection property
-            # Determine the range to export based on row/col anchor
             if width is not None and height is not None:
-                # Convert pixel dimensions to approximate cell range
-                # Use the anchor cell as starting point
-                # For simplicity, use a reasonable end range
-                end_row = row + max(1, height // 20)  # rough cell estimate
+                end_row = row + max(1, height // 20)
                 end_col = col + max(1, width // 80)
                 cell_range = sheet_obj.getCellRangeByPosition(
                     col, row, end_col, end_row
                 )
             else:
-                # Use a default area: from anchor to a reasonable extent
-                # Get the used range or use the anchor cell area
                 cell_range = sheet_obj.getCellRangeByPosition(
                     col, row, max(col + 10, col), max(row + 20, row)
                 )
             controller.select(cell_range)
 
-            # Build FilterData properties
             pixel_w = width if width is not None else int(dpi * 8.27)
             pixel_h = height if height is not None else int(dpi * 11.69)
 
@@ -144,7 +123,6 @@ def snapshot_area(
             fd_height.Value = pixel_h
             filter_data.append(fd_height)
 
-            # Build export properties
             props = []
 
             p_filter = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
@@ -159,7 +137,6 @@ def snapshot_area(
             )
             props.append(p_data)
 
-            # Add Selection to export only the specified area
             p_sel = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
             p_sel.Name = "Selection"
             p_sel.Value = cell_range
@@ -173,7 +150,6 @@ def snapshot_area(
         finally:
             doc.close(True)
 
-    # Read PNG dimensions from IHDR chunk
     actual_width, actual_height = _read_png_dimensions(output)
 
     return SnapshotResult(
@@ -185,7 +161,7 @@ def snapshot_area(
 
 
 def _read_png_dimensions(path: Path) -> tuple[int, int]:
-    """Read width and height from a PNG file's IHDR chunk.
+    """Read width and height from a PNG file.
 
     Args:
         path: Path to the PNG file.
@@ -193,9 +169,15 @@ def _read_png_dimensions(path: Path) -> tuple[int, int]:
     Returns:
         Tuple of (width, height) in pixels.
     """
-    with open(path, "rb") as f:
-        f.read(8)  # PNG signature
-        f.read(4)  # IHDR chunk length
-        f.read(4)  # IHDR chunk type
-        w, h = struct.unpack(">II", f.read(8))
-    return w, h
+    try:
+        from PIL import Image
+
+        with Image.open(path) as img:
+            return img.size
+    except ImportError:
+        import struct
+
+        with open(path, "rb") as f:
+            f.read(16)
+            w, h = struct.unpack(">II", f.read(8))
+        return w, h

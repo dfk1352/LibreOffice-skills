@@ -1,5 +1,3 @@
-"""Tests for applying Calc patches."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -8,7 +6,7 @@ from tests.calc._helpers import get_cell_number_format, named_range_exists
 
 
 def test_patch_atomic_mode_success_saves_document(tmp_path):
-    from calc import CalcTarget, open_calc_session, patch
+    from calc import CalcTarget, CalcSession, patch
     from calc.core import create_spreadsheet
 
     doc_path = tmp_path / "atomic_ok.ods"
@@ -73,7 +71,7 @@ def test_patch_atomic_mode_success_saves_document(tmp_path):
         "ok",
     ]
 
-    with open_calc_session(str(doc_path)) as session:
+    with CalcSession(str(doc_path)) as session:
         total = session.read_cell(CalcTarget(kind="cell", sheet="Data", row=3, col=1))
 
     assert total["formula"] == "=SUM(B2:B3)"
@@ -88,13 +86,13 @@ def test_patch_atomic_mode_success_saves_document(tmp_path):
 
 
 def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
-    from calc import CalcTarget, open_calc_session, patch
+    from calc import CalcTarget, CalcSession, patch
     from calc.core import create_spreadsheet
 
     doc_path = tmp_path / "atomic_fail.ods"
     create_spreadsheet(str(doc_path))
 
-    with open_calc_session(str(doc_path)) as session:
+    with CalcSession(str(doc_path)) as session:
         session.write_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
             "baseline",
@@ -136,7 +134,7 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
         "skipped",
     ]
 
-    with open_calc_session(str(doc_path)) as session:
+    with CalcSession(str(doc_path)) as session:
         preserved = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
         )
@@ -151,7 +149,7 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
 def test_patch_best_effort_mode_records_partial_success_and_persists_mutations(
     tmp_path,
 ):
-    from calc import CalcTarget, open_calc_session, patch
+    from calc import CalcTarget, CalcSession, patch
     from calc.core import create_spreadsheet
 
     doc_path = tmp_path / "best_effort.ods"
@@ -191,7 +189,7 @@ def test_patch_best_effort_mode_records_partial_success_and_persists_mutations(
         "ok",
     ]
 
-    with open_calc_session(str(doc_path)) as session:
+    with CalcSession(str(doc_path)) as session:
         first = session.read_cell(CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0))
         second = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)

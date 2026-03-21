@@ -56,19 +56,19 @@ def get_slide_count(path: str) -> int:
             doc.close(True)
 
 
-def export_presentation(path: str, output_path: str, format: str) -> None:
+def export_presentation(path: str, output_path: str, export_format: str) -> None:
     """Export a presentation to another format.
 
     Args:
         path: Path to the presentation file.
         output_path: Destination file path.
-        format: Export format key ("pdf" or "pptx").
+        export_format: Export format key ("pdf" or "pptx").
 
     Raises:
         ImpressSkillError: If the export format is unsupported.
     """
-    if format not in EXPORT_FILTERS:
-        raise ImpressSkillError(f"Unsupported export format: {format}")
+    if export_format not in EXPORT_FILTERS:
+        raise ImpressSkillError(f"Unsupported export format: {export_format}")
 
     file_path = Path(path)
     if not file_path.exists():
@@ -86,7 +86,7 @@ def export_presentation(path: str, output_path: str, format: str) -> None:
 
             filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
             filter_prop.Name = "FilterName"
-            filter_prop.Value = EXPORT_FILTERS[format]
+            filter_prop.Value = EXPORT_FILTERS[export_format]
             doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
         finally:
             doc.close(True)

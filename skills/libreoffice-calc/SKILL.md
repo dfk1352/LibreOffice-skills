@@ -15,11 +15,11 @@ If setup or runtime issues appear, check `references/troubleshooting.md`.
 ```python
 # Non-session utilities
 create_spreadsheet(path)
-export_spreadsheet(path, output_path, format)   # formats: "pdf", "xlsx", "csv"
+export_spreadsheet(path, output_path, export_format)   # formats: "pdf", "xlsx", "csv"
 snapshot_area(doc_path, output_path, sheet="Sheet1", row=0, col=0, width=None, height=None, dpi=150)
 
 # Session (primary editing API)
-open_calc_session(path) -> CalcSession
+CalcSession(path) -> context manager
 
 CalcSession methods:
   read_cell(target: CalcTarget) -> dict[str, object]
@@ -41,7 +41,7 @@ CalcSession methods:
   delete_chart(target: CalcTarget)
   recalculate()
   patch(patch_text, mode="atomic") -> PatchApplyResult
-  export(output_path, format)
+  export(output_path, export_format)
   reset()
   close(save=True)
 
@@ -288,18 +288,18 @@ mutations in the current open session state.
 from pathlib import Path
 
 from calc import (
+    CalcSession,
     CalcTarget,
     CellFormatting,
     ChartSpec,
     ValidationRule,
-    open_calc_session,
 )
 from calc.core import create_spreadsheet
 
 output = str(Path("test-output/revenue-report.ods").resolve())
 create_spreadsheet(output)
 
-with open_calc_session(output) as session:
+with CalcSession(output) as session:
     session.rename_sheet(CalcTarget(kind="sheet", sheet="Sheet1"), "Revenue Data")
     session.add_sheet("Summary")
     session.write_range(

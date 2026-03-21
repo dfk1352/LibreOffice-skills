@@ -1,11 +1,10 @@
 """Structured target parsing and resolution for Impress presentations."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
 from colors import resolve_color
+from constants import ALIGNMENT_MAP
 from impress.exceptions import (
     InvalidFormattingError,
     InvalidListError,
@@ -41,7 +40,7 @@ _SHAPE_SELECTOR_KINDS = {
     "list",
     "insertion",
 }
-_ALIGNMENT_MAP = {"left": 0, "right": 1, "justify": 2, "center": 3}
+_ALIGNMENT_MAP = ALIGNMENT_MAP
 
 
 @dataclass(frozen=True)
@@ -117,7 +116,6 @@ def parse_target(raw: dict[str, Any]) -> ImpressTarget:
 
 def resolve_slide_target(target: ImpressTarget, doc: Any) -> Any:
     """Resolve one zero-based slide."""
-    _validate_target(target)
     if target.kind == "master_page":
         raise InvalidTargetError("Master-page targets do not resolve to slides")
     if target.slide_index is None:
@@ -131,7 +129,6 @@ def resolve_slide_target(target: ImpressTarget, doc: Any) -> Any:
 
 def resolve_shape_target(target: ImpressTarget, doc: Any) -> Any:
     """Resolve one shape on one slide by placeholder, name, or index."""
-    _validate_target(target)
     if target.kind == "notes":
         notes_shape = _find_notes_text_shape(
             resolve_slide_target(target, doc).getNotesPage()
@@ -156,18 +153,18 @@ def resolve_shape_target(target: ImpressTarget, doc: Any) -> Any:
     if target.shape_name is not None:
         normalized_target = _normalize_name(target.shape_name)
         exact_matches = [
-            slide.getByIndex(index)
+            shape
             for index in range(slide.Count)
-            if _normalize_name(_shape_name(slide.getByIndex(index)))
+            if _normalize_name(_shape_name(shape := slide.getByIndex(index)))
             == normalized_target
         ]
         matches = exact_matches
         if not matches:
             matches = [
-                slide.getByIndex(index)
+                shape
                 for index in range(slide.Count)
                 if _matches_uno_duplicate_name(
-                    _normalize_name(_shape_name(slide.getByIndex(index))),
+                    _normalize_name(_shape_name(shape := slide.getByIndex(index))),
                     normalized_target,
                 )
             ]
@@ -186,10 +183,10 @@ def resolve_shape_target(target: ImpressTarget, doc: Any) -> Any:
 
     if target.shape_type is not None:
         matches = [
-            slide.getByIndex(index)
+            shape
             for index in range(slide.Count)
             if target.shape_type.lower()
-            in str(slide.getByIndex(index).ShapeType).lower()
+            in str((shape := slide.getByIndex(index)).ShapeType).lower()
         ]
         if not matches:
             raise TargetNoMatchError(f'Shape type not found: "{target.shape_type}"')
@@ -206,7 +203,6 @@ def resolve_shape_target(target: ImpressTarget, doc: Any) -> Any:
 
 def resolve_text_range(target: ImpressTarget, doc: Any) -> Any:
     """Resolve a text target to one UNO text range."""
-    _validate_target(target)
     if target.kind not in _TEXTUAL_KINDS:
         raise InvalidTargetError(
             f"Target kind '{target.kind}' does not resolve to text"
@@ -260,7 +256,6 @@ def resolve_insertion_point(target: ImpressTarget | None, doc: Any) -> Any:
         cursor.gotoEnd(False)
         return cursor
 
-    _validate_target(target)
     if target.kind != "insertion":
         raise InvalidTargetError("Insertion points require target.kind = insertion")
 
@@ -301,7 +296,6 @@ def resolve_insertion_point(target: ImpressTarget | None, doc: Any) -> Any:
 
 def resolve_list_target(target: ImpressTarget, doc: Any) -> list[Any]:
     """Resolve one structural list block within slide or notes text."""
-    _validate_target(target)
     if target.kind != "list":
         raise InvalidTargetError("List resolution requires target.kind = list")
 
@@ -339,7 +333,6 @@ def resolve_list_target(target: ImpressTarget, doc: Any) -> list[Any]:
 
 def resolve_master_page_target(target: ImpressTarget, doc: Any) -> Any:
     """Resolve one master page by name."""
-    _validate_target(target)
     if target.kind != "master_page":
         raise InvalidTargetError(
             "Master-page resolution requires target.kind = master_page"

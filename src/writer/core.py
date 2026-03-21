@@ -28,19 +28,19 @@ def create_document(path: str) -> None:
         doc = desktop.loadComponentFromURL("private:factory/swriter", "_blank", 0, ())
 
         try:
-            file_url = Path(path).resolve().as_uri()
+            file_url = output.resolve().as_uri()
             doc.storeAsURL(file_url, ())
         finally:
             doc.close(True)
 
 
-def export_document(path: str, output_path: str, format: str) -> None:
+def export_document(path: str, output_path: str, export_format: str) -> None:
     """Export a Writer document to another format.
 
     Args:
         path: Path to the source document.
         output_path: Destination file path.
-        format: Export format key.
+        export_format: Export format key.
 
     Raises:
         DocumentNotFoundError: If the source document does not exist.
@@ -49,10 +49,10 @@ def export_document(path: str, output_path: str, format: str) -> None:
     file_path = Path(path)
     if not file_path.exists():
         raise DocumentNotFoundError(f"Document not found: {path}")
-    if format not in EXPORT_FILTERS:
-        raise WriterSkillError(f"Unsupported export format: {format}")
+    if export_format not in EXPORT_FILTERS:
+        raise WriterSkillError(f"Unsupported export format: {export_format}")
 
-    from writer.session import open_writer_session
+    from writer.session import WriterSession
 
-    with open_writer_session(str(file_path)) as session:
-        session.export(output_path, format)
+    with WriterSession(str(file_path)) as session:
+        session.export(output_path, export_format)

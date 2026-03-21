@@ -11,12 +11,12 @@ import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 
 from exceptions import UnoBridgeError
 
 
-def find_libreoffice() -> Optional[str]:
+def find_libreoffice() -> str | None:
     """Auto-detect LibreOffice installation.
 
     Returns:
@@ -27,7 +27,6 @@ def find_libreoffice() -> Optional[str]:
         if found:
             return found
 
-    # Check common installation locations
     common_paths = [
         "/usr/bin/soffice",
         "/usr/bin/libreoffice",
@@ -44,13 +43,17 @@ def find_libreoffice() -> Optional[str]:
     return None
 
 
-def _resolve_uno_module() -> None:
+def _resolve_uno_module(soffice_path: str | None = None) -> None:
     """Ensure the LibreOffice-provided ``uno`` module can be imported.
 
     Resolution order:
     1. Already importable from the current Python environment.
     2. ``LIBREOFFICE_PROGRAM_PATH`` environment variable override.
     3. Parent directory of the detected ``soffice`` executable.
+
+    Args:
+        soffice_path: Pre-resolved path to soffice executable, to avoid
+            a redundant ``find_libreoffice()`` call.
 
     Raises:
         UnoBridgeError: If no valid LibreOffice program directory is found.
@@ -70,7 +73,8 @@ def _resolve_uno_module() -> None:
     if env_path:
         candidates.append(Path(env_path))
 
-    soffice_path = find_libreoffice()
+    if soffice_path is None:
+        soffice_path = find_libreoffice()
     if soffice_path:
         candidates.append(Path(soffice_path).resolve().parent)
 
@@ -93,19 +97,6 @@ def _resolve_uno_module() -> None:
     )
 
 
-def validate_lo_path(path: str) -> None:
-    """Validate that LibreOffice installation exists at the given path.
-
-    Args:
-        path: Path to LibreOffice installation directory.
-
-    Raises:
-        UnoBridgeError: If the path does not exist.
-    """
-    if not Path(path).exists():
-        raise UnoBridgeError(f"LibreOffice not found: {path}")
-
-
 @contextmanager
 def uno_context() -> Generator[Any, None, None]:
     """Context manager for UNO connection to LibreOffice.
@@ -120,23 +111,20 @@ def uno_context() -> Generator[Any, None, None]:
         with uno_context() as desktop:
             doc = desktop.loadComponentFromURL(...)
     """
-    _resolve_uno_module()
-
-    import uno
-    from com.sun.star.connection import NoConnectException
-
-    # Find LibreOffice
     soffice_path = find_libreoffice()
     if not soffice_path:
         raise UnoBridgeError("LibreOffice not found. Please install LibreOffice.")
 
-    # Generate unique pipe name
+    _resolve_uno_module(soffice_path)
+
+    import uno
+    from com.sun.star.connection import NoConnectException
+
     pipe_name = f"uno_pipe_{os.getpid()}_{int(time.time() * 1000)}"
     connection_string = f"pipe,name={pipe_name}"
     profile_dir = Path(tempfile.mkdtemp(prefix="libreoffice-skills-"))
     profile_url = profile_dir.resolve().as_uri()
 
-    # Start LibreOffice in headless mode
     process = subprocess.Popen(
         [
             soffice_path,
@@ -179,7 +167,6 @@ def uno_context() -> Generator[Any, None, None]:
                     )
                 time.sleep(0.2)
     finally:
-        # Clean up: terminate LibreOffice
         try:
             process.terminate()
             process.wait(timeout=5)

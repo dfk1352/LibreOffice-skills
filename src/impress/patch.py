@@ -1,7 +1,5 @@
 """Patch parsing and application for Impress presentations."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -122,12 +120,12 @@ def apply_operations(
     session, patch_text: str, mode: PatchApplyMode
 ) -> PatchApplyResult:
     """Apply patch operations to an already-open Impress session."""
+    if mode not in {"atomic", "best_effort"}:
+        raise PatchSyntaxError(f"Unsupported patch mode: {mode}")
+
     operations = parse_patch(patch_text)
     results: list[PatchOperationResult] = []
     atomic_snapshot = session._path.read_bytes() if mode == "atomic" else None
-
-    if mode not in {"atomic", "best_effort"}:
-        raise PatchSyntaxError(f"Unsupported patch mode: {mode}")
 
     for index, operation in enumerate(operations):
         try:
@@ -174,14 +172,11 @@ def apply_operations(
     overall_status = "ok"
     if any(result.status == "failed" for result in results):
         overall_status = "partial"
-    document_persisted = overall_status != "failed" and any(
-        result.mutated for result in results
-    )
     return PatchApplyResult(
         mode=mode,
         overall_status=overall_status,
         operations=results,
-        document_persisted=document_persisted,
+        document_persisted=False,
     )
 
 
@@ -189,9 +184,9 @@ def patch(
     path: str, patch_text: str, mode: PatchApplyMode = "atomic"
 ) -> PatchApplyResult:
     """Open a session, apply a patch, and persist if appropriate."""
-    from impress.session import open_impress_session
+    from impress.session import ImpressSession
 
-    session = open_impress_session(path)
+    session = ImpressSession(path)
     try:
         result = apply_operations(session, patch_text, mode)
         should_save = result.overall_status != "failed" and any(
@@ -420,10 +415,7 @@ def _parse_payload(operation_type: str, block: dict[str, str]) -> dict[str, Any]
         )
     if operation_type in {"insert_list", "replace_list"}:
         payload["items"] = _build_list_items(payload.get("items"))
-        if operation_type == "insert_list":
-            payload["ordered"] = payload.get("list.ordered")
-        else:
-            payload["ordered"] = payload.get("list.ordered")
+        payload["ordered"] = payload.get("list.ordered")
     if any(key.startswith("master.") for key in block):
         master_fields = {
             key.split(".", 1)[1]: _coerce_target_value(key.split(".", 1)[1], value)

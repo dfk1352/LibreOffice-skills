@@ -2,14 +2,13 @@
 
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportGeneralTypeIssues=false
 
-from __future__ import annotations
-
 import warnings
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Literal, cast
 
 from colors import resolve_color
+from impress.core import EXPORT_FILTERS
 from impress.exceptions import (
     DocumentNotFoundError,
     ImpressSessionError,
@@ -25,6 +24,9 @@ from impress.targets import (
     ListItem,
     ShapePlacement,
     TextFormatting,
+    _cursor_index,
+    _paragraph_cursor,
+    _shape_name,
     alignment_code,
     resolve_insertion_point,
     resolve_list_target,
@@ -62,10 +64,6 @@ _SHAPE_TYPE_MAP = {
     "line": "com.sun.star.drawing.LineShape",
     "triangle": "com.sun.star.drawing.CustomShape",
     "arrow": "com.sun.star.drawing.CustomShape",
-}
-_EXPORT_FILTERS = {
-    "pdf": "impress_pdf_Export",
-    "pptx": "Impress MS PowerPoint 2007 XML",
 }
 _CHART_TYPE_MAP = {
     "bar": "com.sun.star.chart.BarDiagram",
@@ -116,22 +114,30 @@ class ImpressSession(BaseSession):
         self._require_open()
         self._doc.close(False)
         self._uno_manager.__exit__(None, None, None)
-        self._open_document()
+        try:
+            self._open_document()
+        except Exception:
+            self._closed = True
+            raise
 
     def restore_snapshot(self, snapshot: bytes) -> None:
         self._require_open()
         self._doc.close(False)
         self._uno_manager.__exit__(None, None, None)
         self._path.write_bytes(snapshot)
-        self._open_document()
+        try:
+            self._open_document()
+        except Exception:
+            self._closed = True
+            raise
 
     def get_slide_count(self) -> int:
         self._require_open()
-        return int(self.doc.DrawPages.Count)
+        return int(self._doc.DrawPages.Count)
 
     def get_slide_inventory(self, target: ImpressTarget) -> dict[str, object]:
         self._require_open()
-        slide = resolve_slide_target(target, self.doc)
+        slide = resolve_slide_target(target, self._doc)
         shapes = [
             _shape_summary(slide.getByIndex(index), index)
             for index in range(slide.Count)
@@ -147,7 +153,7 @@ class ImpressSession(BaseSession):
         self._require_open()
         if layout not in _LAYOUT_MAP:
             raise InvalidLayoutError(f"Unknown layout: {layout}")
-        pages = self.doc.DrawPages
+        pages = self._doc.DrawPages
         insert_index = pages.Count if index is None else index
         if insert_index < 0 or insert_index > pages.Count:
             raise InvalidPayloadError(f"Slide index out of range: {insert_index}")
@@ -156,13 +162,13 @@ class ImpressSession(BaseSession):
 
     def delete_slide(self, target: ImpressTarget) -> None:
         self._require_open()
-        slide = resolve_slide_target(target, self.doc)
-        self.doc.DrawPages.remove(slide)
+        slide = resolve_slide_target(target, self._doc)
+        self._doc.DrawPages.remove(slide)
 
     def move_slide(self, target: ImpressTarget, to_index: int) -> None:
         self._require_open()
         source_index = int(target.slide_index) if target.slide_index is not None else -1
-        pages = self.doc.DrawPages
+        pages = self._doc.DrawPages
         count = pages.Count
         if source_index < 0 or source_index >= count:
             raise InvalidPayloadError(f"Slide index out of range: {source_index}")
@@ -170,33 +176,33 @@ class ImpressSession(BaseSession):
             raise InvalidPayloadError(f"Slide index out of range: {to_index}")
         if source_index == to_index:
             return
-        _copy_slide_to_position(self.doc, pages, source_index, to_index)
+        _copy_slide_to_position(self._doc, pages, source_index, to_index)
 
     def duplicate_slide(self, target: ImpressTarget) -> None:
         self._require_open()
-        pages = self.doc.DrawPages
+        pages = self._doc.DrawPages
         source_index = int(target.slide_index) if target.slide_index is not None else -1
         if source_index < 0 or source_index >= pages.Count:
             raise InvalidPayloadError(f"Slide index out of range: {source_index}")
-        self.doc.duplicate(pages.getByIndex(source_index))
+        self._doc.duplicate(pages.getByIndex(source_index))
 
     def read_text(self, target: ImpressTarget) -> str:
         self._require_open()
-        return resolve_text_range(target, self.doc).getString()
+        return resolve_text_range(target, self._doc).getString()
 
     def insert_text(self, text: str, target: ImpressTarget | None = None) -> None:
         self._require_open()
-        cursor = resolve_insertion_point(target, self.doc)
+        cursor = resolve_insertion_point(target, self._doc)
         _insert_string(cursor.getText(), cursor, text)
 
     def replace_text(self, target: ImpressTarget, new_text: str) -> None:
         self._require_open()
-        resolve_text_range(target, self.doc).setString(new_text)
+        resolve_text_range(target, self._doc).setString(new_text)
 
     def format_text(self, target: ImpressTarget, formatting: TextFormatting) -> None:
         self._require_open()
         validate_formatting(formatting)
-        _apply_text_formatting(resolve_text_range(target, self.doc), formatting)
+        _apply_text_formatting(resolve_text_range(target, self._doc), formatting)
 
     def insert_list(
         self,
@@ -206,9 +212,9 @@ class ImpressSession(BaseSession):
     ) -> None:
         self._require_open()
         validate_list_items(items)
-        cursor = resolve_insertion_point(target, self.doc)
+        cursor = resolve_insertion_point(target, self._doc)
         _insert_list_at_cursor(cursor.getText(), cursor, items, ordered)
-        self.doc.store()
+        self._doc.store()
         self.reset()
 
     def replace_list(
@@ -219,10 +225,10 @@ class ImpressSession(BaseSession):
     ) -> None:
         self._require_open()
         validate_list_items(items)
-        paragraphs = resolve_list_target(target, self.doc)
+        paragraphs = resolve_list_target(target, self._doc)
         ordered_value = _list_is_ordered(paragraphs) if ordered is None else ordered
-        _rewrite_list_block(target, paragraphs, items, ordered_value, self.doc)
-        self.doc.store()
+        _rewrite_list_block(target, paragraphs, items, ordered_value, self._doc)
+        self._doc.store()
         self.reset()
 
     def insert_text_box(
@@ -234,8 +240,8 @@ class ImpressSession(BaseSession):
     ) -> None:
         self._require_open()
         validate_placement(placement)
-        page = resolve_slide_target(slide, self.doc)
-        shape = self.doc.createInstance("com.sun.star.drawing.TextShape")
+        page = resolve_slide_target(slide, self._doc)
+        shape = self._doc.createInstance("com.sun.star.drawing.TextShape")
         _set_shape_geometry(shape, placement)
         page.add(shape)
         shape.setString(text)
@@ -255,8 +261,8 @@ class ImpressSession(BaseSession):
         validate_placement(placement)
         if shape_type not in _SHAPE_TYPE_MAP:
             raise InvalidShapeError(f"Unknown shape type: {shape_type}")
-        page = resolve_slide_target(slide, self.doc)
-        shape = self.doc.createInstance(_SHAPE_TYPE_MAP[shape_type])
+        page = resolve_slide_target(slide, self._doc)
+        shape = self._doc.createInstance(_SHAPE_TYPE_MAP[shape_type])
         _set_shape_geometry(shape, placement)
         page.add(shape)
         if shape_type == "triangle":
@@ -274,13 +280,13 @@ class ImpressSession(BaseSession):
     def delete_item(self, target: ImpressTarget) -> None:
         self._require_open()
         if target.kind in _TEXT_DELETE_KINDS:
-            resolve_text_range(target, self.doc).setString("")
+            resolve_text_range(target, self._doc).setString("")
             return
         if target.kind == "list":
             _rewrite_list_block(
-                target, resolve_list_target(target, self.doc), [], False, self.doc
+                target, resolve_list_target(target, self._doc), [], False, self._doc
             )
-            self.doc.store()
+            self._doc.store()
             self.reset()
             return
         if target.kind in _SHAPE_DELETE_KINDS:
@@ -302,9 +308,9 @@ class ImpressSession(BaseSession):
         image_file = Path(image_path)
         if not image_file.exists():
             raise MediaNotFoundError(f"Image not found: {image_path}")
-        page = resolve_slide_target(slide, self.doc)
+        page = resolve_slide_target(slide, self._doc)
         _insert_image_shape(
-            self.doc,
+            self._doc,
             page,
             image_file.resolve().as_uri(),
             placement,
@@ -345,9 +351,9 @@ class ImpressSession(BaseSession):
         validate_placement(placement)
         if rows < 1 or cols < 1:
             raise InvalidPayloadError("rows and cols must be >= 1")
-        page = resolve_slide_target(slide, self.doc)
+        page = resolve_slide_target(slide, self._doc)
         _insert_table_shape(
-            self.doc,
+            self._doc,
             page,
             rows,
             cols,
@@ -358,11 +364,11 @@ class ImpressSession(BaseSession):
 
     def update_table(self, target: ImpressTarget, data: list[list[str]]) -> None:
         self._require_open()
-        model = _resolve_table_model(target, self.doc)
+        model = _resolve_table_model(target, self._doc)
         if model is None:
-            self.doc.store()
+            self._doc.store()
             self.reset()
-            model = _resolve_table_model(target, self.doc)
+            model = _resolve_table_model(target, self._doc)
         if model is None:
             raise InvalidPayloadError("Table model is unavailable after reopen")
         if len(data) != model.Rows.Count:
@@ -375,7 +381,7 @@ class ImpressSession(BaseSession):
                     f"Table row {row_index} expects {model.Columns.Count} values but received {len(row)}"
                 )
         _write_table_data(model, data)
-        self.doc.store()
+        self._doc.store()
 
     def insert_chart(
         self,
@@ -390,9 +396,9 @@ class ImpressSession(BaseSession):
         validate_placement(placement)
         if chart_type not in _CHART_TYPE_MAP:
             raise InvalidPayloadError(f"Unsupported chart type: {chart_type}")
-        page = resolve_slide_target(slide, self.doc)
+        page = resolve_slide_target(slide, self._doc)
         _insert_chart_shape(
-            self.doc,
+            self._doc,
             page,
             chart_type,
             data,
@@ -414,12 +420,12 @@ class ImpressSession(BaseSession):
             raise InvalidPayloadError(
                 "update_chart requires chart_type, data, placement, or title"
             )
-        shape = resolve_shape_target(target, self.doc)
+        shape = resolve_shape_target(target, self._doc)
         if placement is not None:
             validate_placement(placement)
             _set_shape_geometry(shape, placement)
         _update_chart_shape(shape, chart_type=chart_type, data=data, title=title)
-        self.doc.store()
+        self._doc.store()
         self.reset()
         if (
             chart_type is not None
@@ -427,11 +433,11 @@ class ImpressSession(BaseSession):
             or title is not None
             or placement is not None
         ):
-            shape = resolve_shape_target(target, self.doc)
+            shape = resolve_shape_target(target, self._doc)
             if placement is not None:
                 _set_shape_geometry(shape, placement)
             _update_chart_shape(shape, chart_type=chart_type, data=data, title=title)
-            self.doc.store()
+            self._doc.store()
 
     def insert_media(
         self,
@@ -445,9 +451,9 @@ class ImpressSession(BaseSession):
         media_file = Path(media_path)
         if not media_file.exists():
             raise MediaNotFoundError(f"Media not found: {media_path}")
-        page = resolve_slide_target(slide, self.doc)
+        page = resolve_slide_target(slide, self._doc)
         _insert_media_shape(
-            self.doc,
+            self._doc,
             page,
             media_file.resolve().as_uri(),
             placement,
@@ -477,29 +483,29 @@ class ImpressSession(BaseSession):
 
     def set_notes(self, target: ImpressTarget, text: str) -> None:
         self._require_open()
-        resolve_text_range(target, self.doc).setString(text)
+        resolve_text_range(target, self._doc).setString(text)
 
     def get_notes(self, target: ImpressTarget) -> str:
         self._require_open()
-        return resolve_text_range(target, self.doc).getString()
+        return resolve_text_range(target, self._doc).getString()
 
     def list_master_pages(self) -> list[str]:
         self._require_open()
-        masters = self.doc.MasterPages
+        masters = self._doc.MasterPages
         return [str(masters.getByIndex(index).Name) for index in range(masters.Count)]
 
     def apply_master_page(
         self, target: ImpressTarget, master_target: ImpressTarget
     ) -> None:
         self._require_open()
-        master_page = resolve_master_page_target(master_target, self.doc)
-        slide = resolve_slide_target(target, self.doc)
+        master_page = resolve_master_page_target(master_target, self._doc)
+        slide = resolve_slide_target(target, self._doc)
         slide.MasterPage = master_page
 
     def set_master_background(self, target: ImpressTarget, color: int | str) -> None:
         self._require_open()
-        master_page = resolve_master_page_target(target, self.doc)
-        background = self.doc.createInstance("com.sun.star.drawing.Background")
+        master_page = resolve_master_page_target(target, self._doc)
+        background = self._doc.createInstance("com.sun.star.drawing.Background")
         background.FillStyle = 1
         background.FillColor = resolve_color(color)
         master_page.Background = background
@@ -519,7 +525,7 @@ class ImpressSession(BaseSession):
             imported_name = str(template_doc.MasterPages.getByIndex(0).Name)
         finally:
             template_doc.close(True)
-        masters = self.doc.MasterPages
+        masters = self._doc.MasterPages
         for index in range(masters.Count):
             if str(masters.getByIndex(index).Name) == imported_name:
                 return imported_name
@@ -527,18 +533,18 @@ class ImpressSession(BaseSession):
         new_master.Name = imported_name
         return imported_name
 
-    def export(self, output_path: str, format: str) -> None:
+    def export(self, output_path: str, export_format: str) -> None:
         self._require_open()
-        if format not in _EXPORT_FILTERS:
-            raise ImpressSkillError(f"Unsupported export format: {format}")
+        if export_format not in EXPORT_FILTERS:
+            raise ImpressSkillError(f"Unsupported export format: {export_format}")
         output = Path(output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
         import uno  # type: ignore[import-not-found]
 
         filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
         filter_prop.Name = "FilterName"
-        filter_prop.Value = _EXPORT_FILTERS[format]
-        self.doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
+        filter_prop.Value = EXPORT_FILTERS[export_format]
+        self._doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
 
     def patch(
         self,
@@ -567,11 +573,6 @@ class ImpressSession(BaseSession):
             raise ImpressSkillError(
                 f"Failed to open Impress document: {self._path}"
             ) from exc
-
-
-def open_impress_session(path: str) -> ImpressSession:
-    """Open an Impress editing session for an existing presentation."""
-    return ImpressSession(path)
 
 
 def _shape_summary(shape: Any, index: int) -> dict[str, object]:
@@ -773,7 +774,42 @@ def _insert_image_shape(
     page.add(shape)
     shape.GraphicURL = image_url
     try:
-        shape.Description = image_url
+        shape.Description = Path(image_url).stem if image_url else ""
+    except Exception:
+        pass
+    if name is not None:
+        _assign_shape_name(shape, name)
+    return shape
+
+
+def _copy_graphic_shape(
+    doc: Any,
+    page: Any,
+    src_shape: Any,
+    placement: ShapePlacement,
+    *,
+    name: str | None,
+) -> Any:
+    """Copy an image shape by transferring its Graphic object directly.
+
+    Unlike _insert_image_shape (which takes a file URI), this copies the
+    in-memory Graphic from an existing shape, avoiding the need to resolve
+    an external URL for embedded images.
+    """
+    shape = doc.createInstance("com.sun.star.drawing.GraphicObjectShape")
+    _set_shape_geometry(shape, placement)
+    page.add(shape)
+    graphic = getattr(src_shape, "Graphic", None)
+    if graphic is not None:
+        shape.Graphic = graphic
+    else:
+        for attribute in ("GraphicURL", "GraphicStreamURL"):
+            value = getattr(src_shape, attribute, "")
+            if value:
+                shape.GraphicURL = str(value)
+                break
+    try:
+        shape.Description = getattr(src_shape, "Description", "")
     except Exception:
         pass
     if name is not None:
@@ -1003,19 +1039,16 @@ def _replace_url_backed_shape(
 
 
 def _image_url_from_shape(shape: Any) -> str:
-    description = getattr(shape, "Description", "")
-    if description:
-        return str(description)
-    for attribute in ("GraphicStreamURL",):
-        value = getattr(shape, attribute, "")
-        if value:
-            return str(value)
     graphic = getattr(shape, "Graphic", None)
     if graphic is not None:
         for attribute in ("OriginURL", "URL"):
             value = getattr(graphic, attribute, "")
             if value:
                 return str(value)
+    for attribute in ("GraphicURL", "GraphicStreamURL"):
+        value = getattr(shape, attribute, "")
+        if value:
+            return str(value)
     raise InvalidPayloadError("Image shape does not expose a persisted source URL")
 
 
@@ -1135,13 +1168,7 @@ def _copy_shape_to_slide(doc: Any, target: Any, src_shape: Any) -> None:
     placement = _placement_from_shape(src_shape)
     name = _shape_name(src_shape) or None
     if shape_type == "com.sun.star.drawing.GraphicObjectShape":
-        _insert_image_shape(
-            doc,
-            target,
-            _image_url_from_shape(src_shape),
-            placement,
-            name=name,
-        )
+        _copy_graphic_shape(doc, target, src_shape, placement, name=name)
         return
     if shape_type == "com.sun.star.drawing.TableShape":
         rows, cols, data = _table_payload_from_shape(src_shape)
@@ -1331,27 +1358,11 @@ def _assign_shape_name(shape: Any, name: str) -> None:
             pass
 
 
-def _shape_name(shape: Any) -> str:
-    if hasattr(shape, "getName"):
-        try:
-            return str(shape.getName())
-        except Exception:
-            pass
-    return str(getattr(shape, "Name", ""))
-
-
 def _is_placeholder_shape(shape: Any) -> bool:
     if not bool(getattr(shape, "IsPresentationObject", False)):
         return False
     shape_type = str(getattr(shape, "ShapeType", ""))
     return not shape_type.endswith("MediaShape")
-
-
-def _paragraph_cursor(paragraph: Any) -> Any:
-    text_obj = paragraph.getText()
-    cursor = text_obj.createTextCursorByRange(paragraph.getStart())
-    cursor.gotoRange(paragraph.getEnd(), True)
-    return cursor
 
 
 def _enumerate_paragraphs(text_obj: Any) -> list[Any]:
@@ -1360,10 +1371,3 @@ def _enumerate_paragraphs(text_obj: Any) -> list[Any]:
     while enumeration.hasMoreElements():
         paragraphs.append(enumeration.nextElement())
     return paragraphs
-
-
-def _cursor_index(text_obj: Any, position: Any) -> int:
-    cursor = text_obj.createTextCursor()
-    cursor.gotoStart(False)
-    cursor.gotoRange(position, True)
-    return len(cursor.getString())

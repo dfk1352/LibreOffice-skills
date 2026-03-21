@@ -1,5 +1,3 @@
-"""Tests for Impress slide snapshot export."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -24,22 +22,21 @@ def test_snapshot_result_fields():
 
 
 def test_snapshot_error_hierarchy():
-    from impress.exceptions import ImpressSkillError
-    from impress.snapshot import FilterError, SnapshotError
+    from impress.exceptions import FilterError, ImpressSkillError, SnapshotError
 
     assert issubclass(SnapshotError, ImpressSkillError)
     assert issubclass(FilterError, SnapshotError)
 
 
 def test_snapshot_slide_creates_png(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
     from impress.snapshot import snapshot_slide
 
     path = tmp_path / "snap.odp"
     create_presentation(str(path))
 
-    with open_impress_session(str(path)) as session:
+    with ImpressSession(str(path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Snapshot test",
@@ -97,3 +94,19 @@ def test_snapshot_slide_custom_dimensions(tmp_path):
     assert result.height > 0
     assert out_path.exists()
     assert out_path.stat().st_size > 0
+
+
+def test_convert_to_pngs_raises_snapshot_error_on_timeout(tmp_path, monkeypatch):
+    """subprocess.TimeoutExpired propagates as FilterError."""
+    import subprocess
+
+    from impress.exceptions import FilterError
+    from impress.snapshot import _convert_to_pngs
+
+    def mock_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="soffice", timeout=120)
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    with pytest.raises(FilterError, match="timed out"):
+        _convert_to_pngs(str(tmp_path / "dummy.odp"), tmp_path)

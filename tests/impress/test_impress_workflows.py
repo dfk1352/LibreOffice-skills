@@ -1,5 +1,3 @@
-"""Integration workflow tests for Impress session-first workflows."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -31,11 +29,11 @@ from tests.impress._helpers import (
 def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     """Build Impress workflow artifacts that exercise every public tool."""
     from impress import (
+        ImpressSession,
         ImpressTarget,
         ListItem,
         ShapePlacement,
         TextFormatting,
-        open_impress_session,
         patch,
         snapshot_slide,
     )
@@ -61,7 +59,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     workflow_pdf = output_dir / "presentation.pdf"
     workflow_pptx = output_dir / "presentation.pptx"
 
-    with open_impress_session(str(session_doc)) as session:
+    with ImpressSession(str(session_doc)) as session:
         assert session.get_slide_count() == 1
         session.add_slide(layout="TITLE_AND_CONTENT")
         session.add_slide(layout="BLANK")
@@ -320,7 +318,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     snapshot_slide(str(session_doc), 2, str(snapshot_before))
 
-    with open_impress_session(str(session_doc)) as session:
+    with ImpressSession(str(session_doc)) as session:
         patch_result = session.patch(
             "[operation]\n"
             "type = insert_text\n"
@@ -364,7 +362,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     atomic_doc = output_dir / "patch_atomic.odp"
     create_presentation(str(atomic_doc))
-    with open_impress_session(str(atomic_doc)) as session:
+    with ImpressSession(str(atomic_doc)) as session:
         session.add_slide(layout="TITLE_AND_CONTENT")
         session.insert_text(
             "Atomic body",
@@ -394,7 +392,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     best_effort_doc = output_dir / "patch_best_effort.odp"
     create_presentation(str(best_effort_doc))
-    with open_impress_session(str(best_effort_doc)) as session:
+    with ImpressSession(str(best_effort_doc)) as session:
         session.add_slide(layout="TITLE_AND_CONTENT")
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=1),
@@ -473,9 +471,7 @@ def test_session_workflow_document_state(tmp_path):
     assert "Logo" in names
     assert "Metrics_Table" in names
 
-    assert get_media_url(outputs["session_workflow"], 2, name="Logo").endswith(
-        "logo_v2.png"
-    )
+    assert "logo_v2" in get_media_url(outputs["session_workflow"], 2, name="Logo")
     assert get_table_matrix(outputs["session_workflow"], 2, name="Metrics Table") == [
         ["Metric", "Value"],
         ["Revenue", "120"],

@@ -166,7 +166,7 @@ def resolve_color(color: int | str) -> int:
     if not isinstance(color, str):
         raise TypeError("Color must be an int or color name string")
 
-    key = color.strip().lower().replace(" ", "").replace("-", "")
+    key = color.strip().lower().replace(" ", "").replace("-", "").replace("_", "")
     if key in CSS_COLORS:
         return CSS_COLORS[key]
     raise ValueError(f"Unknown color name: {color}")

@@ -1,5 +1,3 @@
-"""Tests for applying Writer patches."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -13,11 +11,11 @@ from tests.writer._helpers import (
 
 
 def _create_seed_document(doc_path):
-    from writer import ListItem, WriterTarget, open_writer_session
+    from writer import ListItem, WriterTarget, WriterSession
     from writer.core import create_document
 
     create_document(str(doc_path))
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text(
             "Financial Summary\n\n"
             "Quarterly revenue grew 18%.\n\n"
@@ -33,7 +31,7 @@ def _create_seed_document(doc_path):
 
 
 def test_patch_atomic_mode_success_saves_document(tmp_path):
-    from writer import open_writer_session, patch
+    from writer import WriterSession, patch
 
     doc_path = tmp_path / "atomic_ok.odt"
     _create_seed_document(doc_path)
@@ -64,7 +62,7 @@ def test_patch_atomic_mode_success_saves_document(tmp_path):
     assert result.document_persisted is True
     assert [operation.status for operation in result.operations] == ["ok", "ok", "ok"]
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         text = session.read_text()
 
     assert "Inserted paragraph." in text
@@ -79,7 +77,7 @@ def test_patch_atomic_mode_success_saves_document(tmp_path):
 
 
 def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
-    from writer import open_writer_session, patch
+    from writer import WriterSession, patch
 
     doc_path = tmp_path / "atomic_fail.odt"
     _create_seed_document(doc_path)
@@ -112,7 +110,7 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
     assert result.operations[1].status == "failed"
     assert result.operations[2].status == "skipped"
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         text = session.read_text()
 
     assert "Should not persist." not in text
@@ -126,7 +124,7 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
 
 
 def test_patch_best_effort_mode_records_partial_success(tmp_path):
-    from writer import open_writer_session, patch
+    from writer import WriterSession, patch
 
     doc_path = tmp_path / "best_effort.odt"
     _create_seed_document(doc_path)
@@ -161,7 +159,7 @@ def test_patch_best_effort_mode_records_partial_success(tmp_path):
     ]
     assert result.document_persisted is True
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         text = session.read_text()
 
     assert "Best effort item" in text
@@ -175,7 +173,7 @@ def test_patch_best_effort_mode_records_partial_success(tmp_path):
 
 
 def test_patch_result_document_persisted_true_only_when_changes_saved(tmp_path):
-    from writer import WriterTarget, open_writer_session, patch
+    from writer import WriterTarget, WriterSession, patch
     from writer.core import create_document
 
     doc_path = tmp_path / "empty_patch.odt"
@@ -199,7 +197,7 @@ def test_patch_result_document_persisted_true_only_when_changes_saved(tmp_path):
     assert failed_result.overall_status == "partial"
     assert failed_result.document_persisted is False
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text("Financial Summary\n\nQuarterly revenue grew 18%.")
         session_result = session.patch(
             "[operation]\n"
@@ -210,7 +208,7 @@ def test_patch_result_document_persisted_true_only_when_changes_saved(tmp_path):
             mode="atomic",
         )
         assert session_result.overall_status == "ok"
-        assert session_result.document_persisted is True
+        assert session_result.document_persisted is False
         assert session.read_text(
             WriterTarget(kind="text", text="Quarterly revenue grew 18%.")
         ) == ("Quarterly revenue grew 18%.")

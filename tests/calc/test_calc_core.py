@@ -1,5 +1,3 @@
-"""Tests for Calc core operations."""
-
 import pytest
 
 
@@ -15,7 +13,6 @@ def test_calc_package_exports_create_spreadsheet() -> None:
     from calc import create_spreadsheet
 
     assert callable(create_spreadsheet)
-    # Verify it's the actual function, not an arbitrary callable
     assert create_spreadsheet.__module__ == "calc.core"
 
 
@@ -28,7 +25,6 @@ def test_export_spreadsheet_pdf(tmp_path) -> None:
     export_spreadsheet(str(path), str(output), "pdf")
     assert output.exists()
     assert output.stat().st_size > 0
-    # Verify it is a valid PDF by checking magic bytes
     with open(output, "rb") as f:
         assert f.read(5) == b"%PDF-"
 
@@ -49,3 +45,16 @@ def test_export_spreadsheet_raises_on_missing_file(tmp_path) -> None:
             str(tmp_path / "export.pdf"),
             "pdf",
         )
+
+
+def test_session_export_unknown_format_raises(tmp_path) -> None:
+    from calc import CalcSession
+    from calc.core import create_spreadsheet
+    from calc.exceptions import CalcSessionError
+
+    doc_path = tmp_path / "bad_export.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        with pytest.raises(CalcSessionError, match="Unsupported export format"):
+            session.export(str(tmp_path / "out.bmp"), "bmp")

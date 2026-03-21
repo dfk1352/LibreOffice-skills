@@ -1,5 +1,3 @@
-"""Shared helpers for Impress tests."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations

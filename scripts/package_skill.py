@@ -90,12 +90,23 @@ def package_all(output_dir: Path) -> list[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("skill_dir", type=Path, nargs="?")
-    parser.add_argument("output_dir", type=Path)
     parser.add_argument(
         "--all",
         action="store_true",
         help="Package all skills under the skills/ directory",
+    )
+    parser.add_argument(
+        "--output-dir",
+        "-o",
+        type=Path,
+        required=True,
+        help="Directory to write .skill archives",
+    )
+    parser.add_argument(
+        "skill_dir",
+        type=Path,
+        nargs="?",
+        help="Path to a single skill directory (omit when using --all)",
     )
     args = parser.parse_args()
 

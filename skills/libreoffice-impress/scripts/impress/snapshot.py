@@ -1,6 +1,5 @@
 """Impress snapshot module for slide-level PNG export."""
 
-import struct
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -8,18 +7,10 @@ from pathlib import Path
 
 from impress.exceptions import (
     DocumentNotFoundError,
-    ImpressSkillError,
+    FilterError,
     InvalidSlideIndexError,
 )
 from uno_bridge import find_libreoffice, uno_context
-
-
-class SnapshotError(ImpressSkillError):
-    """Base error for snapshot operations."""
-
-
-class FilterError(SnapshotError):
-    """Error when PNG export filter fails."""
 
 
 @dataclass
@@ -120,7 +111,7 @@ def snapshot_slide(
 
 
 def _read_png_dimensions(path: Path) -> tuple[int, int]:
-    """Read width and height from a PNG file's IHDR chunk.
+    """Read width and height from a PNG file.
 
     Args:
         path: Path to the PNG file.
@@ -128,12 +119,18 @@ def _read_png_dimensions(path: Path) -> tuple[int, int]:
     Returns:
         Tuple of (width, height) in pixels.
     """
-    with open(path, "rb") as f:
-        f.read(8)  # PNG signature
-        f.read(4)  # IHDR chunk length
-        f.read(4)  # IHDR chunk type
-        w, h = struct.unpack(">II", f.read(8))
-    return w, h
+    try:
+        from PIL import Image
+
+        with Image.open(path) as img:
+            return img.size
+    except ImportError:
+        import struct
+
+        with open(path, "rb") as f:
+            f.read(16)
+            w, h = struct.unpack(">II", f.read(8))
+        return w, h
 
 
 def _convert_to_pngs(doc_path: str, output_dir: Path) -> list[Path]:
@@ -144,25 +141,31 @@ def _convert_to_pngs(doc_path: str, output_dir: Path) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     doc = Path(doc_path).resolve()
 
-    result = subprocess.run(
-        [
-            soffice_path,
-            "--headless",
-            "--invisible",
-            "--nocrashreport",
-            "--nodefault",
-            "--nofirststartwizard",
-            "--nologo",
-            "--norestore",
-            "--convert-to",
-            "png",
-            "--outdir",
-            str(output_dir),
-            str(doc),
-        ],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            [
+                soffice_path,
+                "--headless",
+                "--invisible",
+                "--nocrashreport",
+                "--nodefault",
+                "--nofirststartwizard",
+                "--nologo",
+                "--norestore",
+                "--convert-to",
+                "png",
+                "--outdir",
+                str(output_dir),
+                str(doc),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise FilterError(
+            "LibreOffice PNG conversion timed out after 120 seconds"
+        ) from exc
     if result.returncode != 0:
         raise FilterError(
             "LibreOffice PNG conversion failed: "

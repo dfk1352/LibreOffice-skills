@@ -1,7 +1,5 @@
 """Patch parsing and application for Calc spreadsheets."""
 
-from __future__ import annotations
-
 import json
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -109,11 +107,12 @@ def apply_operations(
     session, patch_text: str, mode: PatchApplyMode
 ) -> PatchApplyResult:
     """Apply patch operations to an already-open Calc session."""
-    operations = parse_patch(patch_text)
-    results: list[PatchOperationResult] = []
-
     if mode not in ("atomic", "best_effort"):
         raise PatchSyntaxError(f"Unsupported patch mode: {mode}")
+
+    operations = parse_patch(patch_text)
+    results: list[PatchOperationResult] = []
+    atomic_snapshot = session._path.read_bytes() if mode == "atomic" else None
 
     for index, operation in enumerate(operations):
         try:
@@ -148,7 +147,8 @@ def apply_operations(
                             mutated=False,
                         )
                     )
-                session.reset()
+                assert atomic_snapshot is not None
+                session.restore_snapshot(atomic_snapshot)
                 return PatchApplyResult(
                     mode=mode,
                     overall_status="failed",
@@ -159,14 +159,11 @@ def apply_operations(
     overall_status = "ok"
     if any(result.status == "failed" for result in results):
         overall_status = "partial"
-    document_persisted = overall_status != "failed" and any(
-        result.mutated for result in results
-    )
     return PatchApplyResult(
         mode=mode,
         overall_status=overall_status,
         operations=results,
-        document_persisted=document_persisted,
+        document_persisted=False,
     )
 
 
@@ -174,9 +171,9 @@ def patch(
     path: str, patch_text: str, mode: PatchApplyMode = "atomic"
 ) -> PatchApplyResult:
     """Open a session, apply a patch, and persist if appropriate."""
-    from calc.session import open_calc_session
+    from calc.session import CalcSession
 
-    session = open_calc_session(path)
+    session = CalcSession(path)
     try:
         result = apply_operations(session, patch_text, mode)
         should_save = result.overall_status != "failed" and any(

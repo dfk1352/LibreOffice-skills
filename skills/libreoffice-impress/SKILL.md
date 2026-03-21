@@ -16,11 +16,11 @@ If setup or runtime issues appear, check `references/troubleshooting.md`.
 # Non-session utilities
 create_presentation(path)
 get_slide_count(path)
-export_presentation(path, output_path, format)   # formats: "pdf", "pptx"
+export_presentation(path, output_path, export_format)   # formats: "pdf", "pptx"
 snapshot_slide(doc_path, slide_index, output_path, width=1280, height=720)
 
 # Session (primary editing API)
-open_impress_session(path) -> ImpressSession
+ImpressSession(path) -> context manager
 
 ImpressSession methods:
   get_slide_count() -> int
@@ -29,6 +29,7 @@ ImpressSession methods:
   delete_slide(target: ImpressTarget)
   move_slide(target: ImpressTarget, to_index)
   duplicate_slide(target: ImpressTarget)
+  delete_item(target: ImpressTarget)
   read_text(target: ImpressTarget) -> str
   insert_text(text, target: ImpressTarget | None = None)
   replace_text(target: ImpressTarget, new_text)
@@ -37,7 +38,6 @@ ImpressSession methods:
   replace_list(target: ImpressTarget, items: list[ListItem], ordered: bool | None = None)
   insert_text_box(slide: ImpressTarget, text, placement: ShapePlacement, name=None)
   insert_shape(slide: ImpressTarget, shape_type, placement: ShapePlacement, fill_color=None, line_color=None, name=None)
-  delete_item(target: ImpressTarget)
   insert_image(slide: ImpressTarget, image_path, placement: ShapePlacement, name=None)
   replace_image(target: ImpressTarget, image_path=None, placement: ShapePlacement | None = None)
   insert_table(slide: ImpressTarget, rows, cols, placement: ShapePlacement, data=None, name=None)
@@ -53,7 +53,7 @@ ImpressSession methods:
   set_master_background(target: ImpressTarget, color)
   import_master_page(template_path) -> str
   patch(patch_text, mode="atomic") -> PatchApplyResult
-  export(output_path, format)
+  export(output_path, export_format)
   reset()
   close(save=True)
 
@@ -248,18 +248,18 @@ mutations in the current open session state.
 from pathlib import Path
 
 from impress import (
+    ImpressSession,
     ImpressTarget,
     ListItem,
     ShapePlacement,
     TextFormatting,
-    open_impress_session,
 )
 from impress.core import create_presentation
 
 output = str(Path("test-output/demo.odp").resolve())
 create_presentation(output)
 
-with open_impress_session(output) as session:
+with ImpressSession(output) as session:
     session.add_slide(layout="TITLE_AND_CONTENT")
     session.replace_text(
         ImpressTarget(kind="text", slide_index=1, placeholder="title"),

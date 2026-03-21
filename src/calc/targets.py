@@ -1,7 +1,5 @@
 """Structured target parsing and resolution for Calc spreadsheets."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -145,7 +143,6 @@ def resolve_sheet_target(target: CalcTarget, doc: Any) -> Any:
 def resolve_cell_target(target: CalcTarget, doc: Any) -> Any:
     """Resolve one cell object."""
     _ensure_kind(target, {"cell"})
-    _validate_target(target)
 
     sheet = resolve_sheet_target(target, doc)
     assert target.row is not None
@@ -156,7 +153,6 @@ def resolve_cell_target(target: CalcTarget, doc: Any) -> Any:
 def resolve_range_target(target: CalcTarget, doc: Any) -> Any:
     """Resolve one rectangular cell range."""
     _ensure_kind(target, {"range"})
-    _validate_target(target)
 
     sheet = resolve_sheet_target(target, doc)
     assert target.row is not None
@@ -174,7 +170,6 @@ def resolve_range_target(target: CalcTarget, doc: Any) -> Any:
 def resolve_named_range_target(target: CalcTarget, doc: Any) -> Any:
     """Resolve one named range object by name."""
     _ensure_kind(target, {"named_range"})
-    _validate_target(target)
 
     assert target.name is not None
     if not doc.NamedRanges.hasByName(target.name):
@@ -185,7 +180,6 @@ def resolve_named_range_target(target: CalcTarget, doc: Any) -> Any:
 def resolve_chart_target(target: CalcTarget, doc: Any) -> Any:
     """Resolve one chart on one sheet by name or zero-based index."""
     _ensure_kind(target, {"chart"})
-    _validate_target(target)
 
     sheet = resolve_sheet_target(target, doc)
     charts = sheet.Charts

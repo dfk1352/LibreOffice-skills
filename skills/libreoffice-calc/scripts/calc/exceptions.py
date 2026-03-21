@@ -1,6 +1,6 @@
 """Custom exceptions for the Calc skill."""
 
-from exceptions import SessionClosedError, UnoBridgeError
+from exceptions import SessionClosedError
 
 
 class CalcSkillError(Exception):
@@ -55,6 +55,22 @@ class DocumentNotFoundError(CalcSkillError):
     """Error when spreadsheet file does not exist."""
 
 
+class SnapshotError(CalcSkillError):
+    """Base error for snapshot operations."""
+
+
+class InvalidSheetError(SnapshotError):
+    """Error when sheet name does not exist."""
+
+
+class InvalidAreaError(SnapshotError):
+    """Error when area coordinates are invalid."""
+
+
+class FilterError(SnapshotError):
+    """Error when PNG export filter fails."""
+
+
 __all__ = [
     "CalcSkillError",
     "CalcSessionError",
@@ -69,6 +85,9 @@ __all__ = [
     "NamedRangeNotFoundError",
     "ChartNotFoundError",
     "DocumentNotFoundError",
-    "UnoBridgeError",
+    "SnapshotError",
+    "InvalidSheetError",
+    "InvalidAreaError",
+    "FilterError",
     "SessionClosedError",
 ]

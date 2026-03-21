@@ -1,5 +1,3 @@
-"""Tests for Impress session lifecycle behaviour."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -15,36 +13,70 @@ from tests.impress._helpers import (
 )
 
 
-def test_open_impress_session_returns_session(tmp_path):
-    from impress import ImpressSession, open_impress_session
+@pytest.fixture(scope="module")
+def closed_impress_session(tmp_path_factory):
+    """An ImpressSession that has been opened and immediately closed.
+
+    Module-scoped so a single LibreOffice round-trip is shared across all
+    parametrized ``test_closed_session_methods_raise_impress_session_error``
+    variants. Each variant only checks that calling a method on the
+    already-closed session raises ``ImpressSessionError`` -- no UNO access
+    is needed for that assertion.
+
+    Returns a ``(session, assets, tmp_path)`` tuple so parametrized lambdas
+    that reference asset paths still work.
+    """
+    from impress import ImpressSession
+    from impress.core import create_presentation
+
+    base = tmp_path_factory.mktemp("closed_impress")
+    doc_path = base / "closed.odp"
+    create_presentation(str(doc_path))
+
+    template_path = base / "template.odp"
+    create_presentation(str(template_path))
+    assets = {
+        "image": create_test_image(base / "logo.png"),
+        "audio": create_test_audio(base / "sample.wav"),
+        "video": create_test_video(base / "sample.mp4"),
+        "template": template_path,
+    }
+
+    session = ImpressSession(str(doc_path))
+    session.close()
+    return session, assets, base
+
+
+def test_impress_session_returns_session(tmp_path):
+    from impress import ImpressSession
     from impress.core import create_presentation
 
     doc_path = tmp_path / "session.odp"
     create_presentation(str(doc_path))
 
-    session = open_impress_session(str(doc_path))
+    session = ImpressSession(str(doc_path))
     try:
         assert isinstance(session, ImpressSession)
     finally:
         session.close()
 
 
-def test_open_impress_session_missing_path_raises(tmp_path):
-    from impress import open_impress_session
+def test_impress_session_missing_path_raises(tmp_path):
+    from impress import ImpressSession
     from impress.exceptions import DocumentNotFoundError
 
     with pytest.raises(DocumentNotFoundError):
-        open_impress_session(str(tmp_path / "missing.odp"))
+        ImpressSession(str(tmp_path / "missing.odp"))
 
 
 def test_session_close_save_true_persists_changes(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "persist.odp"
     create_presentation(str(doc_path))
 
-    session = open_impress_session(str(doc_path))
+    session = ImpressSession(str(doc_path))
     session.insert_text_box(
         ImpressTarget(kind="slide", slide_index=0),
         "Saved once",
@@ -57,13 +89,13 @@ def test_session_close_save_true_persists_changes(tmp_path):
 
 
 def test_session_close_save_false_discards_changes(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "discard.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as initial_session:
+    with ImpressSession(str(doc_path)) as initial_session:
         initial_session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Keep me",
@@ -71,7 +103,7 @@ def test_session_close_save_false_discards_changes(tmp_path):
             name="Persisted Box",
         )
 
-    session = open_impress_session(str(doc_path))
+    session = ImpressSession(str(doc_path))
     session.insert_text_box(
         ImpressTarget(kind="slide", slide_index=0),
         "Discard me",
@@ -86,13 +118,13 @@ def test_session_close_save_false_discards_changes(tmp_path):
 
 
 def test_session_reset_discards_in_memory_changes_and_reloads_saved_state(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
 
     doc_path = tmp_path / "reset.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as initial_session:
+    with ImpressSession(str(doc_path)) as initial_session:
         initial_session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Persisted",
@@ -100,7 +132,7 @@ def test_session_reset_discards_in_memory_changes_and_reloads_saved_state(tmp_pa
             name="Persisted Box",
         )
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Draft",
@@ -112,6 +144,29 @@ def test_session_reset_discards_in_memory_changes_and_reloads_saved_state(tmp_pa
     texts = [shape["text"] for shape in get_slide_shapes(doc_path, 0)]
     assert "Persisted" in texts
     assert "Draft" not in texts
+
+
+def test_session_restore_snapshot_marks_closed_on_reopen_failure(tmp_path):
+    from unittest.mock import patch as mock_patch
+
+    from impress import ImpressSession
+    from impress.core import create_presentation
+    from impress.exceptions import ImpressSessionError
+
+    doc_path = tmp_path / "restore_fail.odp"
+    create_presentation(str(doc_path))
+
+    original_bytes = doc_path.read_bytes()
+    session = ImpressSession(str(doc_path))
+
+    with mock_patch.object(
+        ImpressSession, "_open_document", side_effect=RuntimeError("simulated failure")
+    ):
+        with pytest.raises(RuntimeError, match="simulated failure"):
+            session.restore_snapshot(original_bytes)
+
+    with pytest.raises(ImpressSessionError):
+        session.get_slide_count()
 
 
 @pytest.mark.parametrize(
@@ -352,46 +407,43 @@ def test_session_reset_discards_in_memory_changes_and_reloads_saved_state(tmp_pa
         ("reset", lambda session, assets, tmp_path: session.reset()),
     ],
 )
-def test_closed_session_methods_raise_impress_session_error(tmp_path, label, call):
-    from impress import open_impress_session
-    from impress.core import create_presentation
+def test_closed_session_methods_raise_impress_session_error(
+    closed_impress_session,
+    label,
+    call,
+):
     from impress.exceptions import ImpressSessionError
 
-    doc_path = tmp_path / f"closed_{label}.odp"
-    create_presentation(str(doc_path))
-    assets = _create_assets(tmp_path)
-
-    session = open_impress_session(str(doc_path))
-    session.close()
+    session, assets, base_tmp = closed_impress_session
 
     with pytest.raises(ImpressSessionError):
-        call(session, assets, tmp_path)
+        call(session, assets, base_tmp)
 
 
 def test_session_close_twice_raises_impress_session_error(tmp_path):
-    from impress import open_impress_session
+    from impress import ImpressSession
     from impress.core import create_presentation
     from impress.exceptions import ImpressSessionError
 
     doc_path = tmp_path / "double_close.odp"
     create_presentation(str(doc_path))
 
-    session = open_impress_session(str(doc_path))
+    session = ImpressSession(str(doc_path))
     session.close()
 
     with pytest.raises(ImpressSessionError):
         session.close()
 
 
-def test_open_impress_session_context_manager_closes_after_block(tmp_path):
-    from impress import ImpressTarget, ShapePlacement, open_impress_session
+def test_impress_session_context_manager_closes_after_block(tmp_path):
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
     from impress.core import create_presentation
     from impress.exceptions import ImpressSessionError
 
     doc_path = tmp_path / "context.odp"
     create_presentation(str(doc_path))
 
-    with open_impress_session(str(doc_path)) as session:
+    with ImpressSession(str(doc_path)) as session:
         session.insert_text_box(
             ImpressTarget(kind="slide", slide_index=0),
             "Context managed",
@@ -403,19 +455,6 @@ def test_open_impress_session_context_manager_closes_after_block(tmp_path):
         session.get_slide_count()
 
     assert get_shape_text(doc_path, 0, name="Context Box") == "Context managed"
-
-
-def _create_assets(tmp_path):
-    from impress.core import create_presentation
-
-    template_path = tmp_path / "template.odp"
-    create_presentation(str(template_path))
-    return {
-        "image": create_test_image(tmp_path / "logo.png"),
-        "audio": create_test_audio(tmp_path / "sample.wav"),
-        "video": create_test_video(tmp_path / "sample.mp4"),
-        "template": template_path,
-    }
 
 
 def _slide_target():

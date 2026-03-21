@@ -15,11 +15,11 @@ If setup or runtime issues appear, check `references/troubleshooting.md`.
 ```python
 # Non-session utilities
 create_document(path)
-export_document(path, output_path, format)   # formats: "pdf", "docx"
+export_document(path, output_path, export_format)   # formats: "pdf", "docx"
 snapshot_page(doc_path, output_path, page=1, dpi=150)
 
 # Session (primary editing API)
-open_writer_session(path) -> WriterSession
+WriterSession(path) -> context manager
 
 WriterSession methods:
   read_text(target: WriterTarget | None = None) -> str
@@ -36,8 +36,10 @@ WriterSession methods:
   insert_list(items: list[ListItem], ordered: bool, target: WriterTarget | None = None)
   replace_list(target: WriterTarget, items: list[ListItem], ordered: bool | None = None)
   delete_list(target: WriterTarget)
+  set_metadata(field, value)          # field: "title", "subject", "description", "author"
+  get_metadata() -> dict[str, str]
   patch(patch_text, mode="atomic") -> PatchApplyResult
-  export(output_path, format)
+  export(output_path, export_format)
   reset()
   close(save=True)
 
@@ -190,13 +192,13 @@ mutations in the current open session state.
 ```python
 from pathlib import Path
 
-from writer import ListItem, TextFormatting, WriterTarget, open_writer_session
+from writer import ListItem, TextFormatting, WriterSession, WriterTarget
 from writer.core import create_document
 
 output = str(Path("test-output/report.odt").resolve())
 create_document(output)
 
-with open_writer_session(output) as session:
+with WriterSession(output) as session:
     session.insert_text(
         "Executive Summary\n\n"
         "Financial Summary\n\n"

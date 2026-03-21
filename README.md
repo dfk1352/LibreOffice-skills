@@ -168,10 +168,10 @@ import writer
 # Create a blank document
 writer.create_document("report.odt")
 
-with writer.open_writer_session("report.odt") as session:
+with writer.WriterSession("report.odt") as session:
     session.insert_text("Q1 Sales Report\n")
     session.format_text(
-        target=writer.WriterTarget(kind="paragraph", occurrence=1),
+        target=writer.WriterTarget(kind="text", text="Q1 Sales Report"),
         formatting=writer.TextFormatting(bold=True, font_size=18),
     )
     session.insert_table(
@@ -183,7 +183,7 @@ with writer.open_writer_session("report.odt") as session:
             ["West",   "201 000", "+19%"],
         ],
     )
-    session.export("report.pdf", format="pdf")
+    session.export("report.pdf", export_format="pdf")
 
 # Render page 1 as PNG for visual check
 result = writer.snapshot_page("report.odt", "report_preview.png", page=1)
@@ -203,7 +203,10 @@ patch_text = """
 type = write_range
 target.kind = range
 target.sheet = Sheet1
-target.range = A1:C4
+target.row = 0
+target.col = 0
+target.end_row = 3
+target.end_col = 2
 data <<JSON
 [
   ["Department", "Budget",  "Spent"],
@@ -217,10 +220,12 @@ JSON
 type = format_range
 target.kind = range
 target.sheet = Sheet1
-target.range = A1:C1
+target.row = 0
+target.col = 0
+target.end_row = 0
+target.end_col = 2
 format.bold = true
-format.background_color = 0x4472C4
-format.font_color = 0xFFFFFF
+format.color = 0x4472C4
 """
 
 result = calc.patch("budget.ods", patch_text, mode="atomic")

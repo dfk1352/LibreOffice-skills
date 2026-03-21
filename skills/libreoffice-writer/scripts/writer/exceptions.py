@@ -1,6 +1,6 @@
 """Custom exceptions for Writer skill."""
 
-from exceptions import SessionClosedError, UnoBridgeError
+from exceptions import SessionClosedError
 
 
 class WriterSkillError(Exception):
@@ -59,10 +59,21 @@ class InvalidPayloadError(PatchOperationError):
     """Error when patch payload data is invalid for the target."""
 
 
+class SnapshotError(WriterSkillError):
+    """Base error for snapshot operations."""
+
+
+class InvalidPageError(SnapshotError):
+    """Error when page number is out of bounds."""
+
+
+class FilterError(SnapshotError):
+    """Error when PNG export filter fails."""
+
+
 __all__ = [
     "WriterSkillError",
     "WriterSessionError",
-    "UnoBridgeError",
     "SessionClosedError",
     "DocumentNotFoundError",
     "InvalidMetadataError",
@@ -76,4 +87,7 @@ __all__ = [
     "InvalidTableError",
     "ImageNotFoundError",
     "InvalidPayloadError",
+    "SnapshotError",
+    "InvalidPageError",
+    "FilterError",
 ]

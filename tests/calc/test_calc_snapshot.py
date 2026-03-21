@@ -1,5 +1,3 @@
-"""Tests for Calc snapshot (area-level PNG export)."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 import pytest
@@ -7,13 +5,13 @@ import pytest
 
 def test_snapshot_error_hierarchy():
     """SnapshotError is a CalcSkillError; subclasses inherit."""
-    from calc.snapshot import (
+    from calc.exceptions import (
+        CalcSkillError,
         FilterError,
         InvalidAreaError,
         InvalidSheetError,
         SnapshotError,
     )
-    from calc.exceptions import CalcSkillError
 
     assert issubclass(SnapshotError, CalcSkillError)
     assert issubclass(InvalidSheetError, SnapshotError)
@@ -35,7 +33,8 @@ def test_snapshot_result_fields():
 def test_snapshot_area_invalid_sheet_raises(tmp_path):
     """snapshot_area raises InvalidSheetError for nonexistent sheet."""
     from calc.core import create_spreadsheet
-    from calc.snapshot import InvalidSheetError, snapshot_area
+    from calc.exceptions import InvalidSheetError
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -47,7 +46,8 @@ def test_snapshot_area_invalid_sheet_raises(tmp_path):
 def test_snapshot_area_negative_row_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative row."""
     from calc.core import create_spreadsheet
-    from calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.exceptions import InvalidAreaError
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -59,7 +59,8 @@ def test_snapshot_area_negative_row_raises(tmp_path):
 def test_snapshot_area_negative_col_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative col."""
     from calc.core import create_spreadsheet
-    from calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.exceptions import InvalidAreaError
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -71,7 +72,8 @@ def test_snapshot_area_negative_col_raises(tmp_path):
 def test_snapshot_area_negative_width_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative width."""
     from calc.core import create_spreadsheet
-    from calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.exceptions import InvalidAreaError
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -83,7 +85,8 @@ def test_snapshot_area_negative_width_raises(tmp_path):
 def test_snapshot_area_negative_height_raises(tmp_path):
     """snapshot_area raises InvalidAreaError for negative height."""
     from calc.core import create_spreadsheet
-    from calc.snapshot import InvalidAreaError, snapshot_area
+    from calc.exceptions import InvalidAreaError
+    from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
@@ -103,13 +106,13 @@ def test_snapshot_area_missing_doc_raises(tmp_path):
 
 def test_snapshot_area_creates_png(tmp_path):
     """snapshot_area creates a valid PNG file with non-zero size."""
-    from calc import CalcTarget, open_calc_session
+    from calc import CalcTarget, CalcSession
     from calc.core import create_spreadsheet
     from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
-    with open_calc_session(str(doc_path)) as session:
+    with CalcSession(str(doc_path)) as session:
         session.write_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
             "Hello",
@@ -127,11 +130,9 @@ def test_snapshot_area_creates_png(tmp_path):
     assert out_path.exists()
     assert out_path.stat().st_size > 0
 
-    # Verify it's a valid PNG (magic bytes)
     with open(out_path, "rb") as f:
         assert f.read(8) == b"\x89PNG\r\n\x1a\n"
 
-    # Verify result metadata
     assert result.file_path == str(out_path)
     assert result.width > 0
     assert result.height > 0
@@ -170,13 +171,13 @@ def test_snapshot_area_custom_dpi(tmp_path):
 
 def test_snapshot_area_with_cell_anchor(tmp_path):
     """snapshot_area with row/col captures from the specified cell position."""
-    from calc import CalcTarget, open_calc_session
+    from calc import CalcTarget, CalcSession
     from calc.core import create_spreadsheet
     from calc.snapshot import snapshot_area
 
     doc_path = tmp_path / "test.ods"
     create_spreadsheet(str(doc_path))
-    with open_calc_session(str(doc_path)) as session:
+    with CalcSession(str(doc_path)) as session:
         session.write_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=5, col=3),
             "Anchored",

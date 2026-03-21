@@ -1,5 +1,3 @@
-"""Tests for Writer content CRUD through sessions."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -21,38 +19,38 @@ from tests.writer._helpers import (
 
 
 def _create_document_with_text(doc_path, text):
-    from writer import open_writer_session
+    from writer import WriterSession
     from writer.core import create_document
 
     create_document(str(doc_path))
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text(text)
 
 
 def test_session_insert_text_appends_to_end(tmp_path):
-    from writer import open_writer_session
+    from writer import WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "append_text.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text("Hello")
         assert session.read_text() == "Hello"
 
 
 def test_session_read_text_without_target_returns_full_document(tmp_path):
-    from writer import open_writer_session
+    from writer import WriterSession
 
     doc_path = tmp_path / "read_full.odt"
     _create_document_with_text(doc_path, "Section 1\n\nSection 2\n\nTail")
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         assert session.read_text() == "Section 1\n\nSection 2\n\nTail"
 
 
 def test_session_read_text_with_bounded_target_returns_only_window(tmp_path):
-    from writer import WriterTarget, open_writer_session
+    from writer import WriterTarget, WriterSession
 
     doc_path = tmp_path / "read_partial.odt"
     _create_document_with_text(
@@ -60,7 +58,7 @@ def test_session_read_text_with_bounded_target_returns_only_window(tmp_path):
         "Overview\n\nFinancial Summary\n\nSection 2\n\nRisks\n\nTail",
     )
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         selected_text = session.read_text(
             target=WriterTarget(kind="text", after="Financial Summary", before="Risks")
         )
@@ -71,12 +69,12 @@ def test_session_read_text_with_bounded_target_returns_only_window(tmp_path):
 
 
 def test_session_insert_text_at_insertion_target_after_anchor(tmp_path):
-    from writer import WriterTarget, open_writer_session
+    from writer import WriterTarget, WriterSession
 
     doc_path = tmp_path / "insert_after.odt"
     _create_document_with_text(doc_path, "Introduction\n\nBody")
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text(
             "Inserted",
             target=WriterTarget(kind="insertion", after="Introduction"),
@@ -87,7 +85,7 @@ def test_session_insert_text_at_insertion_target_after_anchor(tmp_path):
 
 
 def test_session_replace_text_uses_bounded_target_for_repeated_phrase(tmp_path):
-    from writer import WriterTarget, open_writer_session
+    from writer import WriterTarget, WriterSession
 
     doc_path = tmp_path / "replace_text.odt"
     _create_document_with_text(
@@ -95,7 +93,7 @@ def test_session_replace_text_uses_bounded_target_for_repeated_phrase(tmp_path):
         "Section A\n\nShared phrase\n\nSection B\n\nShared phrase\n\nTail",
     )
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.replace_text(
             WriterTarget(
                 kind="text", text="Shared phrase", after="Section B", before="Tail"
@@ -109,14 +107,14 @@ def test_session_replace_text_uses_bounded_target_for_repeated_phrase(tmp_path):
 
 
 def test_session_format_text_applies_character_formatting_to_targeted_phrase(tmp_path):
-    from writer import TextFormatting, WriterTarget, open_writer_session
+    from writer import TextFormatting, WriterTarget, WriterSession
 
     doc_path = tmp_path / "format_text.odt"
     _create_document_with_text(
         doc_path, "Financial Summary\n\nQuarterly revenue grew 18%."
     )
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.format_text(
             WriterTarget(kind="text", text="Quarterly revenue grew 18%."),
             TextFormatting(bold=True, italic=True, underline=True),
@@ -137,28 +135,28 @@ def test_session_format_text_applies_character_formatting_to_targeted_phrase(tmp
 def test_session_format_text_applies_paragraph_alignment_to_targeted_paragraph(
     tmp_path,
 ):
-    from writer import TextFormatting, WriterTarget, open_writer_session
+    from writer import TextFormatting, WriterTarget, WriterSession
 
     doc_path = tmp_path / "format_alignment.odt"
     _create_document_with_text(doc_path, "Heading\n\nCentered paragraph\n\nTail")
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.format_text(
             WriterTarget(kind="text", text="Centered paragraph"),
             TextFormatting(align="center"),
         )
 
-    assert_text_formatting(doc_path, "Centered paragraph", align=2)
+    assert_text_formatting(doc_path, "Centered paragraph", align=3)
 
 
 def test_session_format_text_empty_payload_raises_invalid_formatting_error(tmp_path):
-    from writer import TextFormatting, WriterTarget, open_writer_session
+    from writer import TextFormatting, WriterTarget, WriterSession
     from writer.exceptions import InvalidFormattingError
 
     doc_path = tmp_path / "empty_formatting.odt"
     _create_document_with_text(doc_path, "Only existing text")
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         with pytest.raises(InvalidFormattingError):
             session.format_text(
                 WriterTarget(kind="text", text="Only existing text"),
@@ -167,13 +165,13 @@ def test_session_format_text_empty_payload_raises_invalid_formatting_error(tmp_p
 
 
 def test_session_table_crud_continues_to_work_with_writer_target(tmp_path):
-    from writer import WriterTarget, open_writer_session
+    from writer import WriterTarget, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "table_crud.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_table(2, 3, [["A", "B", "C"], ["1", "2", "3"]], "T1")
         session.update_table(
             WriterTarget(kind="table", name="T1"),
@@ -182,14 +180,14 @@ def test_session_table_crud_continues_to_work_with_writer_target(tmp_path):
 
     assert get_table_names(doc_path) == ["T1"]
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.delete_table(WriterTarget(kind="table", index=0))
 
     assert get_table_names(doc_path) == []
 
 
 def test_session_image_crud_continues_to_work_with_writer_target(tmp_path):
-    from writer import WriterTarget, open_writer_session
+    from writer import WriterTarget, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "image_crud.odt"
@@ -197,7 +195,7 @@ def test_session_image_crud_continues_to_work_with_writer_target(tmp_path):
     second_image = create_test_image(tmp_path / "second.png", color="green")
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_image(str(first_image), width=2000, height=2000, name="Logo")
         session.update_image(
             WriterTarget(kind="image", name="Logo"),
@@ -211,20 +209,20 @@ def test_session_image_crud_continues_to_work_with_writer_target(tmp_path):
     assert abs(height - 3000) <= 1
     assert get_graphic_names(doc_path) == ["Logo"]
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.delete_image(WriterTarget(kind="image", index=0))
 
     assert get_graphic_names(doc_path) == []
 
 
 def test_session_insert_list_creates_unordered_list_in_order(tmp_path):
-    from writer import ListItem, WriterTarget, open_writer_session
+    from writer import ListItem, WriterTarget, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "unordered_list.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text("Action Items")
         session.insert_list(
             [
@@ -244,13 +242,13 @@ def test_session_insert_list_creates_unordered_list_in_order(tmp_path):
 
 
 def test_session_insert_list_creates_ordered_list_when_requested(tmp_path):
-    from writer import ListItem, open_writer_session
+    from writer import ListItem, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "ordered_list.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_list(
             [ListItem(text="First", level=0), ListItem(text="Second", level=0)],
             ordered=True,
@@ -265,13 +263,13 @@ def test_session_insert_list_creates_ordered_list_when_requested(tmp_path):
 
 
 def test_session_insert_list_supports_nested_items(tmp_path):
-    from writer import ListItem, open_writer_session
+    from writer import ListItem, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "nested_list.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_list(
             [
                 ListItem(text="Parent", level=0),
@@ -290,13 +288,13 @@ def test_session_insert_list_supports_nested_items(tmp_path):
 
 
 def test_session_replace_list_replaces_existing_list_and_updates_ordering(tmp_path):
-    from writer import ListItem, WriterTarget, open_writer_session
+    from writer import ListItem, WriterTarget, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "replace_list.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_text("Action Items\n\nRisks")
         session.insert_list(
             [ListItem(text="Old item", level=0)],
@@ -323,13 +321,13 @@ def test_session_replace_list_replaces_existing_list_and_updates_ordering(tmp_pa
 
 
 def test_session_delete_list_removes_targeted_list(tmp_path):
-    from writer import ListItem, WriterTarget, open_writer_session
+    from writer import ListItem, WriterTarget, WriterSession
     from writer.core import create_document
 
     doc_path = tmp_path / "delete_list.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         session.insert_list([ListItem(text="Remove me", level=0)], ordered=False)
         session.delete_list(WriterTarget(kind="list", text="Remove me"))
 
@@ -337,14 +335,14 @@ def test_session_delete_list_removes_targeted_list(tmp_path):
 
 
 def test_session_invalid_list_payloads_raise_invalid_list_error(tmp_path):
-    from writer import ListItem, open_writer_session
+    from writer import ListItem, WriterSession
     from writer.core import create_document
     from writer.exceptions import InvalidListError
 
     doc_path = tmp_path / "invalid_list.odt"
     create_document(str(doc_path))
 
-    with open_writer_session(str(doc_path)) as session:
+    with WriterSession(str(doc_path)) as session:
         with pytest.raises(InvalidListError):
             session.insert_list([], ordered=False)
         with pytest.raises(InvalidListError):

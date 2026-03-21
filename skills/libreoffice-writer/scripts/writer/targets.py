@@ -1,7 +1,5 @@
 """Structured target parsing and resolution for Writer documents."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -83,7 +81,6 @@ def parse_target(raw: dict[str, Any]) -> WriterTarget:
 def resolve_text_range(target: WriterTarget, doc: Any) -> Any:
     """Resolve a text target to one UNO text range."""
     _ensure_kind(target, {"text"})
-    _validate_target(target)
 
     bounds = _resolve_window(target, doc)
     if target.text is None:
@@ -105,7 +102,6 @@ def resolve_insertion_point(target: WriterTarget | None, doc: Any) -> Any:
         return cursor
 
     _ensure_kind(target, {"insertion"})
-    _validate_target(target)
 
     start, end = _resolve_window(target, doc)
     if target.text is not None:
@@ -126,7 +122,6 @@ def resolve_insertion_point(target: WriterTarget | None, doc: Any) -> Any:
 def resolve_list_target(target: WriterTarget, doc: Any) -> list[Any]:
     """Resolve a target to one logical list block."""
     _ensure_kind(target, {"list"})
-    _validate_target(target)
 
     bounds = _resolve_window(target, doc)
     groups = _collect_list_groups(doc)
@@ -148,7 +143,6 @@ def resolve_list_target(target: WriterTarget, doc: Any) -> list[Any]:
 def resolve_table_target(target: WriterTarget, doc: Any) -> Any:
     """Resolve a target to one text table."""
     _ensure_kind(target, {"table"})
-    _validate_target(target)
     if target.name is not None:
         tables = doc.getTextTables()
         names = list(tables.getElementNames())
@@ -174,7 +168,6 @@ def resolve_table_target(target: WriterTarget, doc: Any) -> Any:
 def resolve_image_target(target: WriterTarget, doc: Any) -> Any:
     """Resolve a target to one image."""
     _ensure_kind(target, {"image"})
-    _validate_target(target)
     graphics = doc.getGraphicObjects()
     if target.name is not None:
         names = list(graphics.getElementNames())

@@ -31,19 +31,19 @@ def create_spreadsheet(path: str) -> None:
             doc.close(True)
 
 
-def export_spreadsheet(path: str, output_path: str, format: str) -> None:
+def export_spreadsheet(path: str, output_path: str, export_format: str) -> None:
     """Export a spreadsheet to another format.
 
     Args:
         path: Path to the spreadsheet file.
         output_path: Destination file path.
-        format: Export format key.
+        export_format: Export format key.
 
     Raises:
         CalcSkillError: If the export format is unsupported.
     """
-    if format not in EXPORT_FILTERS:
-        raise CalcSkillError(f"Unsupported export format: {format}")
+    if export_format not in EXPORT_FILTERS:
+        raise CalcSkillError(f"Unsupported export format: {export_format}")
     file_path = Path(path)
     if not file_path.exists():
         raise DocumentNotFoundError(f"Document not found: {path}")
@@ -60,7 +60,7 @@ def export_spreadsheet(path: str, output_path: str, format: str) -> None:
         try:
             import uno
 
-            filter_name = EXPORT_FILTERS[format]
+            filter_name = EXPORT_FILTERS[export_format]
             filter_prop = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
             filter_prop.Name = "FilterName"
             filter_prop.Value = filter_name

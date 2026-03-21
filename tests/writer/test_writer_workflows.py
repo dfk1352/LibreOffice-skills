@@ -1,5 +1,3 @@
-"""Integration workflow tests for Writer tools and session workflows."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         ListItem,
         TextFormatting,
         WriterTarget,
-        open_writer_session,
+        WriterSession,
         patch,
         snapshot_page,
     )
@@ -37,7 +35,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     logo_v1 = create_test_image(output_dir / "logo_v1.png", color="blue")
     logo_v2 = create_test_image(output_dir / "logo_v2.png", color="green")
 
-    with open_writer_session(str(session_doc)) as session:
+    with WriterSession(str(session_doc)) as session:
         session.insert_text(
             "Executive Summary\n\n"
             "Financial Summary\n\n"
@@ -151,7 +149,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     atomic_doc = output_dir / "patch_atomic.odt"
     create_document(str(atomic_doc))
-    with open_writer_session(str(atomic_doc)) as session:
+    with WriterSession(str(atomic_doc)) as session:
         session.insert_text(
             "Executive Summary\n\n"
             "Financial Summary\n\n"
@@ -182,7 +180,7 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     best_effort_doc = output_dir / "patch_best_effort.odt"
     create_document(str(best_effort_doc))
-    with open_writer_session(str(best_effort_doc)) as session:
+    with WriterSession(str(best_effort_doc)) as session:
         session.insert_text(
             "Status Report\n\n"
             "Financial Summary\n\n"
@@ -225,11 +223,11 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
 def test_session_workflow_document_state(tmp_path):
     """Session workflow leaves visible text, tables, images, formatting, and lists."""
-    from writer import open_writer_session
+    from writer import WriterSession
 
     outputs = run_end_to_end_workflow(tmp_path)
 
-    with open_writer_session(str(outputs["session_workflow"])) as session:
+    with WriterSession(str(outputs["session_workflow"])) as session:
         text = session.read_text()
 
     assert "Executive Summary\nInserted after summary.\n\nFinancial Summary" in text
@@ -242,7 +240,7 @@ def test_session_workflow_document_state(tmp_path):
         outputs["session_workflow"],
         "Quarterly revenue grew 21%.",
         char_weight=150.0,
-        align=2,
+        align=3,
     )
     assert_list_items(
         outputs["session_workflow"],
@@ -254,14 +252,14 @@ def test_session_workflow_document_state(tmp_path):
 
 def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_path):
     """Standalone patch workflow preserves the intended document outcomes."""
-    from writer import open_writer_session
+    from writer import WriterSession
 
     outputs = run_end_to_end_workflow(tmp_path)
 
-    with open_writer_session(str(outputs["patch_atomic"])) as session:
+    with WriterSession(str(outputs["patch_atomic"])) as session:
         atomic_text = session.read_text()
 
-    with open_writer_session(str(outputs["patch_best_effort"])) as session:
+    with WriterSession(str(outputs["patch_best_effort"])) as session:
         best_effort_text = session.read_text()
 
     assert "Atomic addition." in atomic_text

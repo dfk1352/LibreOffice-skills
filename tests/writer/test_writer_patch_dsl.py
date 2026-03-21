@@ -1,5 +1,3 @@
-"""Tests for the Writer patch DSL parser."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from __future__ import annotations

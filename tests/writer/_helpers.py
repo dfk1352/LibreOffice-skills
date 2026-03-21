@@ -1,5 +1,3 @@
-"""Shared helpers for Writer tests."""
-
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false
 
 from collections.abc import Iterator
