@@ -346,7 +346,7 @@ from impress import snapshot_slide
 
 result = snapshot_slide(doc_path, 0, "/tmp/slide1.png")
 print(result.file_path, result.width, result.height)
-Path(result.file_path).unlink(missing_ok=True)
+Path(result.file_path).unlink(missing_ok=True)   # cleanup used snapshots
 ```
 
 Use snapshots to verify slide layout after text edits, master-page changes,

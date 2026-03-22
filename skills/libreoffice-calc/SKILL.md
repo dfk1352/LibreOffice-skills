@@ -382,7 +382,7 @@ from calc import snapshot_area
 
 result = snapshot_area(doc_path, "/tmp/revenue.png", sheet="Revenue Data", row=0, col=0, dpi=150)
 print(result.file_path, result.width, result.height)
-Path(result.file_path).unlink(missing_ok=True)
+Path(result.file_path).unlink(missing_ok=True)   # cleanup used snapshots
 ```
 
 Use snapshots to verify chart placement, formatting, and sheet layout before delivery.

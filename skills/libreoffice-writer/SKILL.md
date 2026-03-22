@@ -266,7 +266,7 @@ from writer import snapshot_page
 
 result = snapshot_page(doc_path, "/tmp/page1.png", page=1, dpi=150)
 print(result.file_path, result.width, result.height)
-Path(result.file_path).unlink(missing_ok=True)
+Path(result.file_path).unlink(missing_ok=True)   # cleanup used snapshots
 ```
 
 Use snapshots to verify layout after formatting, list edits, image placement, or table changes.
