@@ -44,7 +44,7 @@ Local first, free to use.
 |---|---|---|
 | Python | 3.12+ | |
 | LibreOffice | 7.x or 24.x | System-installed; headless mode used |
-| uv | any recent | Recommended package manager for development |
+| uv | any recent | Recommended package manager (for development only) |
 
 ### Installing LibreOffice
 
@@ -77,8 +77,6 @@ npx openskills install dfk1352/LibreOffice-skills
 
 ### From Source
 
-For development or when you want to pin a specific commit:
-
 ```bash
 git clone https://github.com/dfk1352/LibreOffice-skills.git
 cd LibreOffice-skills
@@ -100,6 +98,8 @@ If the `uno` Python module is not on the default path (common on Linux), add the
 
 ```bash
 export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/python3/dist-packages"
+export PYTHONPATH="$HOME/.agents/skills/libreoffice-calc/scripts:/usr/lib/python3/dist-packages"
+export PYTHONPATH="$HOME/.agents/skills/libreoffice-impress/scripts:/usr/lib/python3/dist-packages"
 ```
 
 ---
