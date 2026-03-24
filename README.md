@@ -50,7 +50,7 @@ Local first, free to use.
 
 Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`). Some features, including Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
+The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`). Some features, including Writer Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
 For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
 
 ---
