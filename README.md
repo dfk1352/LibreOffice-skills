@@ -43,14 +43,14 @@ Local first, free to use.
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.12+ | |
-| LibreOffice | 7.x, 24.x, or 26.x | System-installed; headless mode used |
+| LibreOffice | 26.2+ | System-installed; headless mode used |
 | uv | any recent | Recommended package manager for development |
 
 ### Installing LibreOffice
 
 Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`).
+The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`). Some features, including Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
 For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
 
 ---
@@ -240,7 +240,6 @@ print(result.overall_status)   # "ok"
 src/
   uno_bridge.py          # Headless LibreOffice connection
   session.py             # BaseSession ABC
-  constants.py           # Shared constant reference
   colors.py              # Shared color name resolution
   exceptions.py          # Base exception hierarchy
   writer/                # Writer skill modules
@@ -254,11 +253,9 @@ skills/
     scripts/             # Bundled modules (writer + shared) — set as PYTHONPATH
   libreoffice-calc/
     SKILL.md
-    references/
     scripts/
   libreoffice-impress/
     SKILL.md
-    references/
     scripts/
 scripts/
   package_skill.py       # Zip a skill directory into a .skill archive

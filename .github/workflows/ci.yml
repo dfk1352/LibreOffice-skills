@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  LIBREOFFICE_VERSION: "26.2.1"
+
 permissions:
   contents: read
   pull-requests: write
@@ -55,10 +58,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install LibreOffice
+      - name: Install LibreOffice 26.2
         run: |
           sudo apt-get update
-          sudo apt-get install -y libreoffice-core libreoffice-writer libreoffice-calc libreoffice-impress
+          sudo apt-get install -y libxinerama1 libcairo2 libcups2 libdbus-1-3 libfontconfig1 libfreetype6 libgcc-s1 libglib2.0-0 libgtk-3-0 libnss3 libpango-1.0-0 libx11-6 libxext6 libxrender1 libxml2 wget tar
+
+          base_url="https://download.documentfoundation.org/libreoffice/stable/${LIBREOFFICE_VERSION}/deb/x86_64"
+          archive="LibreOffice_${LIBREOFFICE_VERSION}_Linux_x86-64_deb.tar.gz"
+
+          wget -q "${base_url}/${archive}"
+          tar -xzf "${archive}"
+          sudo apt-get install -y "LibreOffice_${LIBREOFFICE_VERSION}."*/DEBS/*.deb
+
+          echo "/opt/libreoffice${LIBREOFFICE_VERSION%.*}/program" >> "$GITHUB_PATH"
+          echo "LIBREOFFICE_PROGRAM_PATH=/opt/libreoffice${LIBREOFFICE_VERSION%.*}/program" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: uv sync
