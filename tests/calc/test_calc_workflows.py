@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from tests.calc._helpers import (
@@ -349,6 +350,18 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         mode="best_effort",
     )
 
+    json_source = output_dir / "import_data.json"
+    json_source.write_text(
+        json.dumps(
+            [
+                {"Product": "Widget", "Units": 150, "Revenue": 4500},
+                {"Product": "Gadget", "Units": 80, "Revenue": 3200},
+            ]
+        )
+    )
+    json_imported = output_dir / "json_imported.ods"
+    create_spreadsheet(str(json_imported), source=str(json_source))
+
     return {
         "session_workflow": session_doc,
         "patch_atomic": atomic_doc,
@@ -356,6 +369,7 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         "workflow_pdf": workflow_pdf,
         "snapshot_before": snapshot_before,
         "snapshot_after": snapshot_after,
+        "json_imported": json_imported,
     }
 
 
@@ -475,6 +489,7 @@ def test_workflow_outputs_to_test_output_dir():
         "workflow_pdf",
         "snapshot_before",
         "snapshot_after",
+        "json_imported",
     ):
         path = outputs[key]
         assert path.exists(), f"{key} not found at {path}"
@@ -490,3 +505,19 @@ def test_workflow_outputs_to_test_output_dir():
     for key in ("snapshot_before", "snapshot_after"):
         with open(outputs[key], "rb") as handle:
             assert handle.read(8) == b"\x89PNG\r\n\x1a\n"
+
+
+def test_json_import_workflow_data(tmp_path):
+    """JSON import produces a spreadsheet with the expected tabular data."""
+    from tests.calc._helpers import open_calc_doc
+
+    outputs = run_calc_end_to_end_workflow(tmp_path)
+
+    with open_calc_doc(outputs["json_imported"]) as doc:
+        sheet = doc.getSheets().getByIndex(0)
+        assert sheet.getCellByPosition(0, 0).getString() == "Product"
+        assert sheet.getCellByPosition(1, 0).getString() == "Units"
+        assert sheet.getCellByPosition(2, 0).getString() == "Revenue"
+        assert sheet.getCellByPosition(0, 1).getString() == "Widget"
+        assert sheet.getCellByPosition(1, 1).getString() == "150"
+        assert sheet.getCellByPosition(0, 2).getString() == "Gadget"

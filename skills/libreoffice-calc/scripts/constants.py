@@ -5,4 +5,6 @@ ALIGNMENT_MAP: dict[str, int] = {
     "right": 1,
     "justify": 2,
     "center": 3,
+    "start": 5,
+    "end": 6,
 }

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from colors import resolve_color
+from constants import ALIGNMENT_MAP
 from writer.exceptions import (
     InvalidFormattingError,
     InvalidListError,
@@ -196,7 +197,7 @@ def validate_formatting(formatting: TextFormatting) -> None:
         raise InvalidFormattingError("At least one formatting field is required")
     if formatting.align is not None:
         align_key = str(formatting.align).strip().lower()
-        if align_key not in {"left", "center", "right", "justify"}:
+        if align_key not in ALIGNMENT_MAP:
             raise InvalidFormattingError(f"Unknown align value: {formatting.align}")
     if formatting.color is not None:
         try:

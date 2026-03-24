@@ -213,11 +213,28 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
     session_snapshot = output_dir / "session_workflow_page1.png"
     snapshot_page(str(session_doc), str(session_snapshot), page=1)
 
+    md_source = output_dir / "import_source.md"
+    md_source.write_text(
+        "# Imported Report\n\n"
+        "This document was created from a Markdown file.\n\n"
+        "## Details\n\n"
+        "- First point\n"
+        "- Second point\n"
+    )
+    md_imported = output_dir / "md_imported.odt"
+    create_document(str(md_imported), source=str(md_source))
+
+    md_exported = output_dir / "session_workflow.md"
+    with WriterSession(str(session_doc)) as session:
+        session.export(str(md_exported), "md")
+
     return {
         "session_workflow": session_doc,
         "patch_atomic": atomic_doc,
         "patch_best_effort": best_effort_doc,
         "session_snapshot": session_snapshot,
+        "md_imported": md_imported,
+        "md_exported": md_exported,
     }
 
 
@@ -286,6 +303,23 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
     assert_text_formatting(outputs["patch_best_effort"], "Tail line.", char_underline=1)
 
 
+def test_markdown_workflow_document_state(tmp_path):
+    """Markdown import creates a readable ODT; markdown export captures text."""
+    from writer import WriterSession
+
+    outputs = run_end_to_end_workflow(tmp_path)
+
+    with WriterSession(str(outputs["md_imported"])) as session:
+        imported_text = session.read_text()
+
+    assert "Imported Report" in imported_text
+    assert "created from a Markdown file" in imported_text
+
+    md_content = outputs["md_exported"].read_text()
+    assert "Executive Summary" in md_content
+    assert "Quarterly revenue grew 21%." in md_content
+
+
 def test_workflow_outputs_to_test_output_dir():
     """Produce inspectable workflow output files in test-output/writer/."""
     output_dir = Path("test-output/writer")
@@ -302,6 +336,8 @@ def test_workflow_outputs_to_test_output_dir():
         "patch_atomic",
         "patch_best_effort",
         "session_snapshot",
+        "md_imported",
+        "md_exported",
     ):
         path = outputs[key]
         assert path.exists(), f"{key} not found at {path}"

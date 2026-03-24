@@ -1,5 +1,34 @@
 # Troubleshooting
 
+## "Binary URP bridge disposed during call" with LibreOffice 26.x
+
+Symptom examples:
+
+- `RuntimeException: Binary URP bridge disposed during call`
+- `loadComponentFromURL` succeeds but returns a broken proxy
+
+Cause:
+
+- LibreOffice 26.x installs to `/opt/libreoffice26.x/` with a versioned
+  binary (e.g. `libreoffice26.2`) instead of the usual `soffice` in PATH.
+  System Python does not inherit the `URE_BOOTSTRAP` and `UNO_PATH` environment
+  variables that LO's bundled Python sets automatically. Without them,
+  `uno.getComponentContext()` creates a minimal context that cannot bridge to
+  a running LO instance.
+
+What to check:
+
+1. Ensure you are using the latest version of this skill (the UNO bridge now
+   detects versioned binaries and sets the required variables automatically).
+2. If using a custom `PYTHONPATH` setup, verify that the `uno_bridge.py` from
+   this skill's `scripts/` directory is the one being imported.
+3. As a manual workaround, set the variables before running your script:
+
+```bash
+export URE_BOOTSTRAP="vnd.sun.star.pathname:/opt/libreoffice26.2/program/fundamentalrc"
+export UNO_PATH="/opt/libreoffice26.2/program"
+```
+
 ## UNO import fails after setting `PYTHONPATH`
 
 Symptom examples:
@@ -49,3 +78,22 @@ Recommendations:
 2. Use `CalcTarget(kind="chart", sheet=..., name=...)` when the chart title or
    assigned name is known.
 3. Use chart `index` only when chart order is stable and intentional.
+
+## Version Compatibility
+
+Some Calc skill features depend on LibreOffice 26.2 or newer. The core editing
+API (create, session, export, patch, snapshots) works on older versions.
+
+### JSON / XML import (26.2+)
+
+`create_spreadsheet(path, source="data.json")` and
+`create_spreadsheet(path, source="data.xml")` rely on the orcus-based
+auto-detection added in LibreOffice 26.2. When a JSON or XML file is passed as
+`source`, `loadComponentFromURL` auto-detects the format through orcus without
+needing a `FilterName`. The imported data is then saved as an ODS spreadsheet.
+
+On older versions, this auto-detection is not available and the call will fail
+with a UNO import error or silently produce an empty spreadsheet.
+
+Workaround: convert JSON / XML to CSV or ODS externally before importing on
+pre-26.2 installations.

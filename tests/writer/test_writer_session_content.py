@@ -149,6 +149,42 @@ def test_session_format_text_applies_paragraph_alignment_to_targeted_paragraph(
     assert_text_formatting(doc_path, "Centered paragraph", align=3)
 
 
+def test_session_format_text_start_and_end_alignment(tmp_path):
+    """align='start' maps to ParagraphAdjust.START (5), align='end' to END (6)."""
+    from writer import TextFormatting, WriterTarget, WriterSession
+
+    doc_path = tmp_path / "start_end_align.odt"
+    _create_document_with_text(doc_path, "Start paragraph\n\nEnd paragraph")
+
+    with WriterSession(str(doc_path)) as session:
+        session.format_text(
+            WriterTarget(kind="text", text="Start paragraph"),
+            TextFormatting(align="start"),
+        )
+        session.format_text(
+            WriterTarget(kind="text", text="End paragraph"),
+            TextFormatting(align="end"),
+        )
+
+    assert_text_formatting(doc_path, "Start paragraph", align=5)
+    assert_text_formatting(doc_path, "End paragraph", align=6)
+
+
+def test_session_format_text_invalid_alignment_raises(tmp_path):
+    from writer import TextFormatting, WriterTarget, WriterSession
+    from writer.exceptions import InvalidFormattingError
+
+    doc_path = tmp_path / "bad_align.odt"
+    _create_document_with_text(doc_path, "Some text")
+
+    with WriterSession(str(doc_path)) as session:
+        with pytest.raises(InvalidFormattingError, match="Unknown align value"):
+            session.format_text(
+                WriterTarget(kind="text", text="Some text"),
+                TextFormatting(align="middle"),
+            )
+
+
 def test_session_format_text_empty_payload_raises_invalid_formatting_error(tmp_path):
     from writer import TextFormatting, WriterTarget, WriterSession
     from writer.exceptions import InvalidFormattingError

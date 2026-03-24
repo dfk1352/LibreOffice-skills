@@ -43,15 +43,15 @@ Local first, free to use.
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.12+ | |
-| LibreOffice | 7.x or 24.x | System-installed; headless mode used |
-| uv | any recent | Recommended package manager (for development only) |
+| LibreOffice | 7.x, 24.x, or 26.x | System-installed; headless mode used |
+| uv | any recent | Recommended package manager for development |
 
 ### Installing LibreOffice
 
 Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate `soffice.exe`.
-For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the `soffice.exe` path.
+The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`).
+For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
 
 ---
 
@@ -77,6 +77,8 @@ npx openskills install dfk1352/LibreOffice-skills
 
 ### From Source
 
+For development or when you want to pin a specific commit:
+
 ```bash
 git clone https://github.com/dfk1352/LibreOffice-skills.git
 cd LibreOffice-skills
@@ -98,8 +100,6 @@ If the `uno` Python module is not on the default path (common on Linux), add the
 
 ```bash
 export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/python3/dist-packages"
-export PYTHONPATH="$HOME/.agents/skills/libreoffice-calc/scripts:/usr/lib/python3/dist-packages"
-export PYTHONPATH="$HOME/.agents/skills/libreoffice-impress/scripts:/usr/lib/python3/dist-packages"
 ```
 
 ---
@@ -124,7 +124,7 @@ Three skills ship in this repository, all sharing the same session/patch design 
 
 ### Writer (`libreoffice-writer`) — `.odt` documents
 
-Full document lifecycle: create, open, read, edit, save, export to PDF or DOCX.
+Full document lifecycle: create, open, read, edit, save, export to PDF, DOCX, or Markdown.
 
 Editing operations cover text insertion and replacement, rich character and paragraph formatting (font, size, color, bold, italic, alignment, spacing), tables (insert, update, delete), images (embed with size control), and unordered/ordered lists.
 
