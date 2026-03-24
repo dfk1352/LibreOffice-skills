@@ -68,7 +68,20 @@ jobs:
 
           wget -q "${base_url}/${archive}"
           tar -xzf "${archive}"
-          sudo apt-get install -y "LibreOffice_${LIBREOFFICE_VERSION}."*/DEBS/*.deb
+
+          extract_dir="$(ARCHIVE="${archive}" python3 - <<'PY'
+          import os
+          import tarfile
+
+          with tarfile.open(os.environ["ARCHIVE"]) as tf:
+              roots = sorted({name.split('/', 1)[0] for name in tf.getnames() if name})
+          if len(roots) != 1:
+              raise SystemExit(f"Expected one archive root, found: {roots}")
+          print(roots[0])
+          PY
+                    )"
+
+          sudo dpkg -i "${extract_dir}"/DEBS/*.deb || sudo apt-get install -fy
 
           echo "/opt/libreoffice${LIBREOFFICE_VERSION%.*}/program" >> "$GITHUB_PATH"
           echo "LIBREOFFICE_PROGRAM_PATH=/opt/libreoffice${LIBREOFFICE_VERSION%.*}/program" >> "$GITHUB_ENV"
