@@ -43,7 +43,7 @@ Local first, free to use.
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.12+ | |
-| LibreOffice | 26.2+ | System-installed; headless mode used |
+| LibreOffice | 26.2+ (recommended) | System-installed; headless mode used |
 | uv | any recent | Recommended package manager for development |
 
 ### Installing LibreOffice
