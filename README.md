@@ -240,6 +240,7 @@ print(result.overall_status)   # "ok"
 src/
   uno_bridge.py          # Headless LibreOffice connection
   session.py             # BaseSession ABC
+  constants.py           # Shared constant reference
   colors.py              # Shared color name resolution
   exceptions.py          # Base exception hierarchy
   writer/                # Writer skill modules
@@ -253,9 +254,11 @@ skills/
     scripts/             # Bundled modules (writer + shared) — set as PYTHONPATH
   libreoffice-calc/
     SKILL.md
+    references/
     scripts/
   libreoffice-impress/
     SKILL.md
+    references/
     scripts/
 scripts/
   package_skill.py       # Zip a skill directory into a .skill archive
