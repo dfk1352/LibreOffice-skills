@@ -43,17 +43,15 @@ Local first, free to use.
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.12+ | |
-| LibreOffice | 26.2+ (recommended) | System-installed; headless mode used |
-| uv | any recent | Recommended package manager for development |
+| LibreOffice | 26.2+ | System-installed; headless mode used |
+| uv | any recent | Recommended package manager (for development only) |
 
 ### Installing LibreOffice
 
 Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`).
+The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`). Some features, including Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
 For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
-
-Some features, including Writer Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
 
 ---
 
@@ -79,8 +77,6 @@ npx openskills install dfk1352/LibreOffice-skills
 
 ### From Source
 
-For development or when you want to pin a specific commit:
-
 ```bash
 git clone https://github.com/dfk1352/LibreOffice-skills.git
 cd LibreOffice-skills
@@ -102,6 +98,8 @@ If the `uno` Python module is not on the default path (common on Linux), add the
 
 ```bash
 export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/python3/dist-packages"
+export PYTHONPATH="$HOME/.agents/skills/libreoffice-calc/scripts:/usr/lib/python3/dist-packages"
+export PYTHONPATH="$HOME/.agents/skills/libreoffice-impress/scripts:/usr/lib/python3/dist-packages"
 ```
 
 ---
