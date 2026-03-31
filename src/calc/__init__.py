@@ -1,7 +1,8 @@
 """Calc skill package."""
 
 from calc.core import create_spreadsheet, export_spreadsheet
-from calc.patch import PatchApplyResult, PatchOperationResult, patch
+from calc.patch import PatchApplyResult, patch
+from patch_base import PatchOperationResult
 from calc.session import CalcSession
 from calc.snapshot import snapshot_area
 from calc.targets import CalcTarget, CellFormatting, ChartSpec, ValidationRule

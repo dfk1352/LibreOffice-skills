@@ -4,9 +4,9 @@ from impress.core import create_presentation, export_presentation, get_slide_cou
 from impress.patch import (
     PatchApplyMode,
     PatchApplyResult,
-    PatchOperationResult,
     patch,
 )
+from patch_base import PatchOperationResult
 from impress.session import ImpressSession
 from impress.snapshot import snapshot_slide
 from impress.targets import (

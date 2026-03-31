@@ -119,7 +119,7 @@ def test_snapshot_slide_preserves_4_3_aspect_ratio(tmp_path):
     A 4:3 presentation (25.4 x 19.05 cm) should produce an image
     whose aspect ratio is closer to 4:3 than 16:9.
     """
-    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress import ImpressSession
     from impress.core import create_presentation
     from impress.snapshot import snapshot_slide
 

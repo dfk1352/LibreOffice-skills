@@ -139,7 +139,6 @@ def test_snapshot_page_respects_document_page_geometry(tmp_path):
     The exported image dimensions should reflect the actual document page size,
     not hardcoded A4 values.
     """
-    from writer import WriterSession
     from writer.core import create_document
     from writer.snapshot import snapshot_page
 

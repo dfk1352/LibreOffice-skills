@@ -3,8 +3,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_exit_on_exception_does_not_save(tmp_path):
     """When an exception is raised inside a with-block, changes must not persist (#1)."""

@@ -9,7 +9,6 @@ from patch_base import (
     PatchApplyMode,
     PatchApplyResult,
     PatchOperation,
-    PatchOperationResult,
     coerce_bool,
     coerce_float,
     coerce_int,
