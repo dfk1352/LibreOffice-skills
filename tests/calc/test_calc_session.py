@@ -121,7 +121,8 @@ def test_session_restore_snapshot_reverts_to_original_content(tmp_path):
     session.write_cell(_cell_target(), "Temporary", value_type="text")
     session.restore_snapshot(original_bytes)
     cell = session.read_cell(_cell_target())
-    assert cell["value"] == 0
+    assert cell["value"] is None
+    assert cell["type"] == "empty"
     session.close(save=False)
 
 
@@ -265,19 +266,16 @@ def test_closed_session_methods_raise_calc_session_error(
         call(session, base_tmp)
 
 
-def test_session_close_twice_raises_calc_session_error(tmp_path):
+def test_session_close_twice_is_idempotent(tmp_path):
     from calc import CalcSession
     from calc.core import create_spreadsheet
-    from calc.exceptions import CalcSessionError
 
     doc_path = tmp_path / "double_close.ods"
     create_spreadsheet(str(doc_path))
 
     session = CalcSession(str(doc_path))
     session.close()
-
-    with pytest.raises(CalcSessionError):
-        session.close()
+    session.close()  # second close is a no-op, no exception
 
 
 def test_calc_session_context_manager_closes_after_block(tmp_path):

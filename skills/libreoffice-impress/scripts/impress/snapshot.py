@@ -9,6 +9,7 @@ from impress.exceptions import (
     DocumentNotFoundError,
     FilterError,
     InvalidSlideIndexError,
+    SnapshotError,
 )
 from uno_bridge import find_libreoffice, uno_context
 
@@ -35,16 +36,20 @@ def snapshot_slide(
     slide_index: int,
     output_path: str,
     width: int = 1280,
-    height: int = 720,
+    height: int | None = None,
 ) -> SnapshotResult:
     """Capture a specific slide as a PNG image.
+
+    The output image preserves the slide's native aspect ratio. If only
+    *width* is given, *height* is computed from the slide dimensions. If
+    both *width* and *height* are given, both are used directly.
 
     Args:
         doc_path: Path to the Impress presentation.
         slide_index: Zero-based slide index.
         output_path: File path for the PNG output.
         width: Pixel width of the output image.
-        height: Pixel height of the output image.
+        height: Pixel height (computed from slide aspect ratio if None).
 
     Returns:
         SnapshotResult with file path, dimensions, and dpi (96).
@@ -71,6 +76,8 @@ def snapshot_slide(
             doc = desktop.loadComponentFromURL(
                 temp_doc.resolve().as_uri(), "_blank", 0, ()
             )
+            if doc is None:
+                raise SnapshotError(f"Failed to open document for snapshot: {doc_path}")
             try:
                 pages = doc.DrawPages
                 if slide_index < 0 or slide_index >= pages.Count:
@@ -78,6 +85,15 @@ def snapshot_slide(
                         f"Slide index {slide_index} out of range "
                         f"(presentation has {pages.Count} slides)"
                     )
+
+                # Read native slide dimensions for aspect ratio
+                target_page = pages.getByIndex(slide_index)
+                slide_w = target_page.Width  # 1/100 mm
+                slide_h = target_page.Height  # 1/100 mm
+                if slide_w > 0 and slide_h > 0:
+                    aspect = slide_w / slide_h
+                else:
+                    aspect = 16.0 / 9.0  # fallback
 
                 for i in range(pages.Count - 1, -1, -1):
                     if i != slide_index:
@@ -87,15 +103,19 @@ def snapshot_slide(
             finally:
                 doc.close(True)
 
+        # Compute final dimensions preserving aspect ratio
+        final_width = width
+        final_height = height if height is not None else int(width / aspect)
+
         png_path = _convert_to_pngs(str(temp_doc), temp_dir_path)[0]
-        if width and height:
+        if final_width and final_height:
             try:
                 from PIL import Image
             except ImportError as exc:
                 raise FilterError("Pillow is required for resizing PNGs") from exc
 
             with Image.open(png_path) as image:
-                resized = image.resize((width, height))
+                resized = image.resize((final_width, final_height))
                 resized.save(output)
         else:
             output.write_bytes(png_path.read_bytes())

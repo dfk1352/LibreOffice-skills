@@ -147,18 +147,20 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
             mode="atomic",
         )
 
-    atomic_doc = output_dir / "patch_atomic.odt"
-    create_document(str(atomic_doc))
-    with WriterSession(str(atomic_doc)) as session:
-        session.insert_text(
-            "Executive Summary\n\n"
-            "Financial Summary\n\n"
-            "Quarterly revenue grew 18%.\n\n"
-            "Action Items"
-        )
+    atomic_baseline_text = (
+        "Executive Summary\n\n"
+        "Financial Summary\n\n"
+        "Quarterly revenue grew 18%.\n\n"
+        "Action Items"
+    )
+
+    atomic_success_doc = output_dir / "patch_atomic_success.odt"
+    create_document(str(atomic_success_doc))
+    with WriterSession(str(atomic_success_doc)) as session:
+        session.insert_text(atomic_baseline_text)
 
     patch(
-        str(atomic_doc),
+        str(atomic_success_doc),
         "[operation]\n"
         "type = insert_text\n"
         "target.kind = insertion\n"
@@ -175,6 +177,30 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         "target.after = Action Items\n"
         "list.ordered = true\n"
         'items = [{"text": "Confirm scope", "level": 0}, {"text": "Review output", "level": 1}]\n',
+        mode="atomic",
+    )
+
+    atomic_fail_doc = output_dir / "patch_atomic_fail.odt"
+    create_document(str(atomic_fail_doc))
+    with WriterSession(str(atomic_fail_doc)) as session:
+        session.insert_text(atomic_baseline_text)
+
+    patch(
+        str(atomic_fail_doc),
+        "[operation]\n"
+        "type = insert_text\n"
+        "target.kind = insertion\n"
+        "target.after = Executive Summary\n"
+        "text = Atomic addition.\n"
+        "[operation]\n"
+        "type = delete_table\n"
+        "target.kind = table\n"
+        "target.name = MissingTable\n"
+        "[operation]\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = Quarterly revenue grew 18%.\n"
+        "format.bold = true\n",
         mode="atomic",
     )
 
@@ -230,7 +256,8 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     return {
         "session_workflow": session_doc,
-        "patch_atomic": atomic_doc,
+        "patch_atomic_success": atomic_success_doc,
+        "patch_atomic_fail": atomic_fail_doc,
         "patch_best_effort": best_effort_doc,
         "session_snapshot": session_snapshot,
         "md_imported": md_imported,
@@ -273,25 +300,35 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
 
     outputs = run_end_to_end_workflow(tmp_path)
 
-    with WriterSession(str(outputs["patch_atomic"])) as session:
-        atomic_text = session.read_text()
+    with WriterSession(str(outputs["patch_atomic_success"])) as session:
+        atomic_success_text = session.read_text()
+
+    with WriterSession(str(outputs["patch_atomic_fail"])) as session:
+        atomic_fail_text = session.read_text()
 
     with WriterSession(str(outputs["patch_best_effort"])) as session:
         best_effort_text = session.read_text()
 
-    assert "Atomic addition." in atomic_text
+    # Atomic success: all ops applied
+    assert "Atomic addition." in atomic_success_text
     assert_text_formatting(
-        outputs["patch_atomic"],
+        outputs["patch_atomic_success"],
         "Quarterly revenue grew 18%.",
         char_weight=150.0,
     )
     assert_list_items(
-        outputs["patch_atomic"],
+        outputs["patch_atomic_success"],
         ["Confirm scope", "Review output"],
         expected_levels=[0, 1],
         expected_numbering_type=ARABIC_NUMBERING_TYPE,
     )
 
+    # Atomic fail: rolled back, document unchanged from baseline
+    assert "Atomic addition." not in atomic_fail_text
+    assert "Executive Summary" in atomic_fail_text
+    assert "Quarterly revenue grew 18%." in atomic_fail_text
+
+    # Best effort: valid ops applied, invalid ops skipped
     assert "Best effort addition" in best_effort_text
     assert "Tail line." in best_effort_text
     assert_list_items(
@@ -333,7 +370,8 @@ def test_workflow_outputs_to_test_output_dir():
 
     for key in (
         "session_workflow",
-        "patch_atomic",
+        "patch_atomic_success",
+        "patch_atomic_fail",
         "patch_best_effort",
         "session_snapshot",
         "md_imported",

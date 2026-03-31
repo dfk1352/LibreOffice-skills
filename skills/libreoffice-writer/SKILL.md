@@ -166,6 +166,7 @@ JSON
 ### Patch value rules
 
 - Use `target.*` fields for target definition.
+- To append at the end of the document, omit all `target.*` fields; do not use a bare `target.kind = insertion` without anchors.
 - Use `format.*` fields for formatting payloads.
 - Use `list.ordered` plus JSON `items` for list operations.
 - `items` and `data` must be valid JSON.

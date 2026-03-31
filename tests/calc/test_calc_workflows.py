@@ -281,9 +281,9 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         height=500,
     )
 
-    atomic_doc = output_dir / "patch_atomic.ods"
-    create_spreadsheet(str(atomic_doc))
-    with CalcSession(str(atomic_doc)) as session:
+    atomic_success_doc = output_dir / "patch_atomic_success.ods"
+    create_spreadsheet(str(atomic_success_doc))
+    with CalcSession(str(atomic_success_doc)) as session:
         session.write_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
             "Atomic baseline",
@@ -291,7 +291,37 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         )
 
     patch(
-        str(atomic_doc),
+        str(atomic_success_doc),
+        "[operation]\n"
+        "type = write_cell\n"
+        "target.kind = cell\n"
+        "target.sheet = Sheet1\n"
+        "target.row = 1\n"
+        "target.col = 0\n"
+        "value = Atomic addition\n"
+        "value_type = text\n"
+        "[operation]\n"
+        "type = write_cell\n"
+        "target.kind = cell\n"
+        "target.sheet = Sheet1\n"
+        "target.row = 2\n"
+        "target.col = 0\n"
+        "value = Second addition\n"
+        "value_type = text\n",
+        mode="atomic",
+    )
+
+    atomic_fail_doc = output_dir / "patch_atomic_fail.ods"
+    create_spreadsheet(str(atomic_fail_doc))
+    with CalcSession(str(atomic_fail_doc)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            "Atomic baseline",
+            value_type="text",
+        )
+
+    patch(
+        str(atomic_fail_doc),
         "[operation]\n"
         "type = write_cell\n"
         "target.kind = cell\n"
@@ -364,7 +394,8 @@ def run_calc_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     return {
         "session_workflow": session_doc,
-        "patch_atomic": atomic_doc,
+        "patch_atomic_success": atomic_success_doc,
+        "patch_atomic_fail": atomic_fail_doc,
         "patch_best_effort": best_effort_doc,
         "workflow_pdf": workflow_pdf,
         "snapshot_before": snapshot_before,
@@ -449,14 +480,36 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
 
     outputs = run_calc_end_to_end_workflow(tmp_path)
 
-    with CalcSession(str(outputs["patch_atomic"])) as session:
-        atomic_baseline = session.read_cell(
+    # Atomic success: all ops applied
+    with CalcSession(str(outputs["patch_atomic_success"])) as session:
+        success_baseline = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
         )
-        atomic_skipped = session.read_cell(
+        success_addition = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
+        )
+        success_second = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=2, col=0)
+        )
+
+    assert success_baseline["value"] == "Atomic baseline"
+    assert success_addition["value"] == "Atomic addition"
+    assert success_second["value"] == "Second addition"
+
+    # Atomic fail: rolled back, document unchanged from baseline
+    with CalcSession(str(outputs["patch_atomic_fail"])) as session:
+        fail_baseline = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
+        )
+        fail_skipped = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
         )
 
+    assert fail_baseline["value"] == "Atomic baseline"
+    assert fail_skipped["value"] is None
+    assert fail_skipped["type"] == "empty"
+
+    # Best effort: valid ops applied, invalid ops skipped
     with CalcSession(str(outputs["patch_best_effort"])) as session:
         best_effort_first = session.read_cell(
             CalcTarget(kind="cell", sheet="Sheet1", row=1, col=0)
@@ -465,8 +518,6 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
             CalcTarget(kind="cell", sheet="Sheet1", row=2, col=0)
         )
 
-    assert atomic_baseline["value"] == "Atomic baseline"
-    assert atomic_skipped["value"] == 0.0
     assert best_effort_first["value"] == "preserved first"
     assert best_effort_later["value"] == "preserved later"
 
@@ -484,7 +535,8 @@ def test_workflow_outputs_to_test_output_dir():
 
     for key in (
         "session_workflow",
-        "patch_atomic",
+        "patch_atomic_success",
+        "patch_atomic_fail",
         "patch_best_effort",
         "workflow_pdf",
         "snapshot_before",

@@ -420,19 +420,16 @@ def test_closed_session_methods_raise_impress_session_error(
         call(session, assets, base_tmp)
 
 
-def test_session_close_twice_raises_impress_session_error(tmp_path):
+def test_session_close_twice_is_idempotent(tmp_path):
     from impress import ImpressSession
     from impress.core import create_presentation
-    from impress.exceptions import ImpressSessionError
 
     doc_path = tmp_path / "double_close.odp"
     create_presentation(str(doc_path))
 
     session = ImpressSession(str(doc_path))
     session.close()
-
-    with pytest.raises(ImpressSessionError):
-        session.close()
+    session.close()  # second close is a no-op, no exception
 
 
 def test_impress_session_context_manager_closes_after_block(tmp_path):
@@ -539,3 +536,168 @@ def _list_items():
     from impress import ListItem
 
     return [ListItem(text="seed", level=0)]
+
+
+# --- import_master_page content tests (#5) ---
+
+
+def test_import_master_page_copies_background_from_template(tmp_path):
+    """import_master_page must copy visual content, not just the name (#5)."""
+    from impress import ImpressSession
+    from impress.core import create_presentation
+
+    # Create a template with a coloured background on its master page
+    template_path = tmp_path / "template.odp"
+    create_presentation(str(template_path))
+
+    with ImpressSession(str(template_path)) as tmpl_session:
+        import uno  # type: ignore[import-not-found]
+
+        master = tmpl_session.doc.MasterPages.getByIndex(0)
+        bg = master.Background
+        bg.setPropertyValue(
+            "FillStyle",
+            uno.Enum("com.sun.star.drawing.FillStyle", "SOLID"),
+        )
+        bg.setPropertyValue("FillColor", 0xFF0000)  # Red
+
+    # Create a target presentation and import the master page
+    doc_path = tmp_path / "target.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        imported_name = session.import_master_page(str(template_path))
+        # Find the imported master page and verify it has the red background
+        masters = session.doc.MasterPages
+        imported_master = None
+        for i in range(masters.Count):
+            if str(masters.getByIndex(i).Name) == imported_name:
+                imported_master = masters.getByIndex(i)
+                break
+
+        assert imported_master is not None
+        bg = imported_master.Background
+        fill_color = bg.getPropertyValue("FillColor")
+        assert fill_color == 0xFF0000, (
+            f"Expected red background (0xFF0000), got {fill_color:#x}"
+        )
+
+
+# --- move_slide fidelity tests (#6) ---
+
+
+def test_move_slide_preserves_text_and_formatting(tmp_path):
+    """move_slide must preserve text content and formatting of shapes (#6)."""
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "move_fidelity.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        # Add a second and third slide
+        session.add_slide()
+        session.add_slide()
+
+        # Insert a text box on slide 0 and apply bold + red via UNO
+        session.insert_text_box(
+            ImpressTarget(kind="slide", slide_index=0),
+            "Bold Red Text",
+            ShapePlacement(2.0, 2.0, 10.0, 3.0),
+            name="BoldBox",
+        )
+        # Apply formatting directly via UNO
+        slide = session.doc.DrawPages.getByIndex(0)
+        for i in range(slide.Count):
+            shape = slide.getByIndex(i)
+            try:
+                if shape.getString() == "Bold Red Text":
+                    cursor = shape.Text.createTextCursor()
+                    cursor.gotoStart(False)
+                    cursor.gotoEnd(True)
+                    from com.sun.star.awt.FontWeight import BOLD  # type: ignore
+
+                    cursor.CharWeight = BOLD
+                    cursor.CharColor = 0xFF0000
+                    break
+            except Exception:
+                continue
+
+    # Move slide 0 to position 2
+    with ImpressSession(str(doc_path)) as session:
+        session.move_slide(
+            ImpressTarget(kind="slide", slide_index=0),
+            to_index=2,
+        )
+
+    # Verify the moved slide (now at index 2) has the text with formatting
+    with ImpressSession(str(doc_path)) as session:
+        slide = session.doc.DrawPages.getByIndex(2)
+        found_text = False
+        for i in range(slide.Count):
+            shape = slide.getByIndex(i)
+            try:
+                text = shape.getString()
+            except Exception:
+                continue
+            if "Bold Red Text" in text:
+                found_text = True
+                # Check that character formatting survived the move
+                cursor = shape.Text.createTextCursor()
+                cursor.gotoStart(False)
+                cursor.gotoEnd(True)
+                from com.sun.star.awt.FontWeight import BOLD  # type: ignore
+
+                assert cursor.CharWeight == BOLD, (
+                    f"Expected bold, got CharWeight={cursor.CharWeight}"
+                )
+                assert cursor.CharColor == 0xFF0000, (
+                    f"Expected red (0xFF0000), got {cursor.CharColor:#x}"
+                )
+                break
+
+        assert found_text, "Moved slide should contain 'Bold Red Text'"
+
+
+def test_move_slide_preserves_table_data(tmp_path):
+    """move_slide must preserve table shape data (#6)."""
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "move_table.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        session.add_slide()
+        # Insert a table on slide 0
+        session.insert_table(
+            ImpressTarget(kind="slide", slide_index=0),
+            2,
+            2,
+            ShapePlacement(2.0, 2.0, 12.0, 5.0),
+            data=[["A", "B"], ["C", "D"]],
+            name="TestTable",
+        )
+
+    # Move slide 0 to position 1
+    with ImpressSession(str(doc_path)) as session:
+        session.move_slide(
+            ImpressTarget(kind="slide", slide_index=0),
+            to_index=1,
+        )
+
+    # Verify the moved slide has a table with correct data
+    with ImpressSession(str(doc_path)) as session:
+        slide = session.doc.DrawPages.getByIndex(1)
+        table_found = False
+        for i in range(slide.Count):
+            shape = slide.getByIndex(i)
+            shape_type = str(getattr(shape, "ShapeType", ""))
+            if shape_type == "com.sun.star.drawing.TableShape":
+                table_found = True
+                model = shape.Model
+                assert model.Rows.Count == 2
+                assert model.Columns.Count == 2
+                break
+
+        assert table_found, "Moved slide should contain a table shape"

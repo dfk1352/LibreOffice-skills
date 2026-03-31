@@ -130,3 +130,51 @@ def test_snapshot_page_custom_dpi(tmp_path):
 
     assert result.dpi == 300
     assert out_path.exists()
+
+
+def test_snapshot_page_respects_document_page_geometry(tmp_path):
+    """A Letter-sized document should produce an image matching Letter aspect ratio (#11).
+
+    Letter is 8.5 x 11 inches. A4 is 8.27 x 11.69 inches.
+    The exported image dimensions should reflect the actual document page size,
+    not hardcoded A4 values.
+    """
+    from writer import WriterSession
+    from writer.core import create_document
+    from writer.snapshot import snapshot_page
+
+    doc_path = tmp_path / "letter.odt"
+    create_document(str(doc_path))
+
+    # Set page size to Letter (8.5" x 11" = 21590 x 27940 in 1/100 mm)
+    # Use UNO context directly to avoid session/contextmanager interaction
+    # with the LO 26.2 UNO struct __setattr__ bug on exception propagation.
+    from uno_bridge import uno_context
+
+    with uno_context() as desktop:
+        doc = desktop.loadComponentFromURL(doc_path.resolve().as_uri(), "_blank", 0, ())
+        try:
+            styles = doc.StyleFamilies.getByName("PageStyles")
+            page_style = styles.getByName("Standard")
+            page_style.setPropertyValue("IsLandscape", False)
+            page_style.setPropertyValue("Width", 21590)  # 8.5 inches
+            page_style.setPropertyValue("Height", 27940)  # 11.0 inches
+            doc.store()
+        finally:
+            doc.close(True)
+
+    out_path = tmp_path / "letter_snap.png"
+    result = snapshot_page(str(doc_path), str(out_path), dpi=150)
+
+    assert out_path.exists()
+    assert result.width > 0
+    assert result.height > 0
+
+    # Letter aspect ratio: 8.5/11 ≈ 0.7727
+    # A4 aspect ratio: 8.27/11.69 ≈ 0.7075
+    actual_ratio = result.width / result.height
+    letter_ratio = 8.5 / 11.0
+    a4_ratio = 8.27 / 11.69
+
+    # The image should be closer to Letter ratio than A4 ratio
+    assert abs(actual_ratio - letter_ratio) < abs(actual_ratio - a4_ratio)

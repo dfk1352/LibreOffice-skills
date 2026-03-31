@@ -1,21 +1,28 @@
 """Custom exceptions for the Impress skill."""
 
-from exceptions import SessionClosedError
+from exceptions import (
+    DocumentNotFoundError as _BaseDocumentNotFoundError,
+    PatchOperationError as _BasePatchOperationError,
+    PatchSyntaxError as _BasePatchSyntaxError,
+    SessionClosedError,
+    SkillError,
+    SnapshotError as _BaseSnapshotError,
+)
 
 
-class ImpressSkillError(Exception):
+class ImpressSkillError(SkillError):
     """Base error for Impress skill."""
 
 
-class ImpressSessionError(ImpressSkillError):
+class ImpressSessionError(ImpressSkillError, SessionClosedError):
     """Error for Impress session lifecycle misuse."""
 
 
-class PatchSyntaxError(ImpressSkillError):
+class PatchSyntaxError(ImpressSkillError, _BasePatchSyntaxError):
     """Error for malformed Impress patch input."""
 
 
-class PatchOperationError(ImpressSkillError):
+class PatchOperationError(ImpressSkillError, _BasePatchOperationError):
     """Base error for parsed Impress patch operations."""
 
 
@@ -43,7 +50,7 @@ class InvalidPayloadError(PatchOperationError):
     """Error for invalid operation payload data."""
 
 
-class DocumentNotFoundError(ImpressSkillError):
+class DocumentNotFoundError(ImpressSkillError, _BaseDocumentNotFoundError):
     """Error when presentation file does not exist."""
 
 
@@ -67,7 +74,7 @@ class MasterNotFoundError(TargetNoMatchError):
     """Compatibility error when a master page name is not found."""
 
 
-class SnapshotError(ImpressSkillError):
+class SnapshotError(ImpressSkillError, _BaseSnapshotError):
     """Base error for snapshot operations."""
 
 

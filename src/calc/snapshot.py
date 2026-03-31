@@ -10,6 +10,7 @@ from calc.exceptions import (
     FilterError,
     InvalidAreaError,
     InvalidSheetError,
+    SnapshotError,
 )
 from uno_bridge import uno_context
 
@@ -84,6 +85,8 @@ def snapshot_area(
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
+        if doc is None:
+            raise SnapshotError(f"Failed to open document for snapshot: {doc_path}")
         try:
             sheets = doc.Sheets
             if not sheets.hasByName(sheet):
@@ -97,8 +100,31 @@ def snapshot_area(
             controller.setActiveSheet(sheet_obj)
 
             if width is not None and height is not None:
-                end_row = row + max(1, height // 20)
-                end_col = col + max(1, width // 80)
+                # Determine cell range using actual column/row geometry
+                end_col = col
+                end_row = row
+                try:
+                    accum_w = 0
+                    # Convert pixel width to 1/100 mm (assume 96 dpi)
+                    target_w_mm100 = width * 2540.0 / 96.0
+                    for c in range(col, col + 200):
+                        cw = sheet_obj.Columns.getByIndex(c).Width
+                        accum_w += cw
+                        end_col = c
+                        if accum_w >= target_w_mm100:
+                            break
+                    accum_h = 0
+                    target_h_mm100 = height * 2540.0 / 96.0
+                    for r in range(row, row + 500):
+                        rh = sheet_obj.Rows.getByIndex(r).Height
+                        accum_h += rh
+                        end_row = r
+                        if accum_h >= target_h_mm100:
+                            break
+                except Exception:
+                    # Fallback heuristic
+                    end_row = row + max(1, height // 20)
+                    end_col = col + max(1, width // 80)
                 cell_range = sheet_obj.getCellRangeByPosition(
                     col, row, end_col, end_row
                 )

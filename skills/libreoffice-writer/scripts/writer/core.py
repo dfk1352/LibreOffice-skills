@@ -71,6 +71,8 @@ def _create_blank(output: Path) -> None:
     """Create an empty Writer document."""
     with uno_context() as desktop:
         doc = desktop.loadComponentFromURL("private:factory/swriter", "_blank", 0, ())
+        if doc is None:
+            raise WriterSkillError("Failed to create blank Writer document")
         try:
             doc.storeAsURL(output.resolve().as_uri(), ())
         finally:
@@ -97,6 +99,8 @@ def _import_source(source: str, output: Path) -> None:
         doc = desktop.loadComponentFromURL(
             source_path.resolve().as_uri(), "_blank", 0, (filter_prop,)
         )
+        if doc is None:
+            raise DocumentNotFoundError(f"Failed to open source document: {source}")
         try:
             doc.storeAsURL(output.resolve().as_uri(), ())
         finally:

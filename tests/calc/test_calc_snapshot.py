@@ -191,3 +191,31 @@ def test_snapshot_area_with_cell_anchor(tmp_path):
     assert out_path.stat().st_size > 0
     assert result.width > 0
     assert result.height > 0
+
+
+def test_snapshot_area_with_nondefault_column_widths(tmp_path):
+    """snapshot_area runs without error when column widths differ from defaults (#11)."""
+    from calc import CalcTarget, CalcSession
+    from calc.core import create_spreadsheet
+    from calc.snapshot import snapshot_area
+
+    doc_path = tmp_path / "wide_cols.ods"
+    create_spreadsheet(str(doc_path))
+
+    # Set column A to a very wide width and write data
+    with CalcSession(str(doc_path)) as session:
+        sheet_obj = session.doc.Sheets.getByName("Sheet1")
+        col_obj = sheet_obj.Columns.getByIndex(0)
+        col_obj.Width = 10000  # ~10 cm, much wider than default
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            "Wide column data",
+            value_type="text",
+        )
+
+    out_path = tmp_path / "wide_snap.png"
+    result = snapshot_area(str(doc_path), str(out_path), width=800, height=600)
+
+    assert out_path.exists()
+    assert result.width > 0
+    assert result.height > 0

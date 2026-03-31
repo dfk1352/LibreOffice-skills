@@ -100,8 +100,18 @@ CalcTarget(
 }
 ```
 
+Empty cells return `type="empty"` with `value=None`:
+
+```python
+{"value": None, "formula": None, "error": None, "type": "empty", "raw": None}
+```
+
 Formula cells use `type="formula"`; when Calc reports a formula error, `error`
 is populated and `value` becomes `None`.
+
+Boolean values (`True`/`False`) are stored as numeric `1.0`/`0.0`. Reading back
+a cell written with a Python bool returns `type="number"` with `value=1.0` or
+`value=0.0`, not a text string.
 
 ## Formatting Payload: `CellFormatting`
 

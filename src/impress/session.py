@@ -96,7 +96,8 @@ class ImpressSession(BaseSession):
         return self._doc
 
     def close(self, save: bool = True) -> None:
-        self._require_open()
+        if self._closed:
+            return
         try:
             if save:
                 self._doc.store()
@@ -521,16 +522,89 @@ class ImpressSession(BaseSession):
             0,
             (),
         )
+        if template_doc is None:
+            raise DocumentNotFoundError(f"Failed to open template: {template_path}")
         try:
-            imported_name = str(template_doc.MasterPages.getByIndex(0).Name)
+            src_master = template_doc.MasterPages.getByIndex(0)
+            imported_name = str(src_master.Name)
+
+            # Find or create target master page
+            masters = self._doc.MasterPages
+            target_master = None
+            for index in range(masters.Count):
+                if str(masters.getByIndex(index).Name) == imported_name:
+                    target_master = masters.getByIndex(index)
+                    break
+
+            if target_master is None:
+                target_master = masters.insertNewByIndex(masters.Count)
+                target_master.Name = imported_name
+
+            # Copy background fill properties via the Background style
+            _BG_FILL_PROPS = (
+                "FillStyle",
+                "FillColor",
+                "FillTransparence",
+                "FillGradient",
+                "FillGradientName",
+                "FillBitmap",
+                "FillBitmapName",
+                "FillBitmapMode",
+                "FillHatch",
+                "FillHatchName",
+                "FillBackground",
+            )
+            src_bg = getattr(src_master, "Background", None)
+            tgt_bg = getattr(target_master, "Background", None)
+            if src_bg is not None and tgt_bg is not None:
+                for prop in _BG_FILL_PROPS:
+                    try:
+                        val = src_bg.getPropertyValue(prop)
+                        tgt_bg.setPropertyValue(prop, val)
+                    except Exception:
+                        pass
+
+            # Copy layout if available
+            try:
+                target_master.Layout = src_master.Layout
+            except Exception:
+                pass
+
+            # Copy non-placeholder shapes from source master
+            for i in range(src_master.Count):
+                src_shape = src_master.getByIndex(i)
+                if _is_placeholder_shape(src_shape):
+                    continue
+                try:
+                    new_shape = self._doc.createInstance(str(src_shape.ShapeType))
+                    new_shape.Size = src_shape.Size
+                    new_shape.Position = src_shape.Position
+                    target_master.add(new_shape)
+                    # Copy text
+                    try:
+                        new_shape.setString(src_shape.getString())
+                    except Exception:
+                        pass
+                    # Copy visual properties
+                    for prop in (
+                        "FillStyle",
+                        "FillColor",
+                        "FillTransparence",
+                        "LineStyle",
+                        "LineColor",
+                        "LineWidth",
+                        "RotateAngle",
+                        "Shadow",
+                        "ShadowColor",
+                    ):
+                        try:
+                            setattr(new_shape, prop, getattr(src_shape, prop))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
         finally:
             template_doc.close(True)
-        masters = self._doc.MasterPages
-        for index in range(masters.Count):
-            if str(masters.getByIndex(index).Name) == imported_name:
-                return imported_name
-        new_master = masters.insertNewByIndex(masters.Count)
-        new_master.Name = imported_name
         return imported_name
 
     def export(self, output_path: str, export_format: str) -> None:
@@ -566,6 +640,13 @@ class ImpressSession(BaseSession):
                 0,
                 (),
             )
+            if self._doc is None:
+                self._uno_manager.__exit__(None, None, None)
+                self._uno_manager = None
+                self._desktop = None
+                raise DocumentNotFoundError(
+                    f"Failed to open Impress document: {self._path}"
+                )
         except Exception as exc:
             self._uno_manager.__exit__(type(exc), exc, exc.__traceback__)
             self._uno_manager = None
@@ -1212,19 +1293,109 @@ def _copy_shape_to_slide(doc: Any, target: Any, src_shape: Any) -> None:
     target.add(new_shape)
     if name is not None:
         _assign_shape_name(new_shape, name)
-    for attribute in ("FillStyle", "FillColor", "LineColor"):
-        try:
-            setattr(new_shape, attribute, getattr(src_shape, attribute))
-        except Exception:
-            pass
+    _copy_shape_visual_props(src_shape, new_shape)
     try:
         new_shape.CustomShapeGeometry = src_shape.CustomShapeGeometry
     except Exception:
         pass
+    _copy_rich_text(src_shape, new_shape)
+
+
+def _copy_shape_visual_props(src: Any, dst: Any) -> None:
+    """Copy visual/fill/line/shadow properties between shapes."""
+    _VISUAL_PROPS = (
+        "FillStyle",
+        "FillColor",
+        "FillTransparence",
+        "LineStyle",
+        "LineColor",
+        "LineWidth",
+        "RotateAngle",
+        "TextAutoGrowHeight",
+        "TextAutoGrowWidth",
+        "Shadow",
+        "ShadowColor",
+        "ShadowXDistance",
+        "ShadowYDistance",
+    )
+    for prop in _VISUAL_PROPS:
+        try:
+            setattr(dst, prop, getattr(src, prop))
+        except Exception:
+            pass
+
+
+def _copy_rich_text(src_shape: Any, dst_shape: Any) -> None:
+    """Copy text with paragraph-level formatting from one shape to another.
+
+    Preserves character properties (bold, italic, colour, font, size)
+    and paragraph alignment. Falls back to plain-text copy if the
+    enumeration API is unavailable.
+    """
     try:
-        new_shape.setString(src_shape.getString())
+        src_text = src_shape.Text
+        dst_text = dst_shape.Text
     except Exception:
-        pass
+        try:
+            dst_shape.setString(src_shape.getString())
+        except Exception:
+            pass
+        return
+
+    try:
+        cursor = dst_text.createTextCursor()
+        cursor.gotoStart(False)
+        cursor.gotoEnd(True)
+        dst_text.insertString(cursor, "", True)  # clear
+
+        src_enum = src_text.createEnumeration()
+        first_para = True
+        while src_enum.hasMoreElements():
+            para = src_enum.nextElement()
+            if not first_para:
+                dst_text.insertControlCharacter(
+                    cursor,
+                    0,
+                    False,  # PARAGRAPH_BREAK
+                )
+            first_para = False
+
+            # Copy paragraph-level alignment
+            for pprop in ("ParaAdjust",):
+                try:
+                    setattr(cursor, pprop, getattr(para, pprop))
+                except Exception:
+                    pass
+
+            portion_enum = para.createEnumeration()
+            while portion_enum.hasMoreElements():
+                portion = portion_enum.nextElement()
+                text_str = portion.getString()
+                dst_text.insertString(cursor, text_str, False)
+                # Move cursor back over the inserted text to apply
+                # character formatting
+                cursor.goLeft(len(text_str), True)
+                _CHAR_PROPS = (
+                    "CharHeight",
+                    "CharWeight",
+                    "CharPosture",
+                    "CharColor",
+                    "CharFontName",
+                    "CharUnderline",
+                    "CharStrikeout",
+                )
+                for cprop in _CHAR_PROPS:
+                    try:
+                        setattr(cursor, cprop, getattr(portion, cprop))
+                    except Exception:
+                        pass
+                cursor.goRight(len(text_str), False)
+    except Exception:
+        # Fallback to plain text
+        try:
+            dst_shape.setString(src_shape.getString())
+        except Exception:
+            pass
 
 
 def _table_payload_from_shape(shape: Any) -> tuple[int, int, list[list[str]]]:

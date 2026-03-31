@@ -303,8 +303,8 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         assert inventory["shape_count"] >= 3
 
         session.duplicate_slide(ImpressTarget(kind="slide", slide_index=0))
-        session.move_slide(ImpressTarget(kind="slide", slide_index=1), 5)
-        session.delete_slide(ImpressTarget(kind="slide", slide_index=5))
+        session.move_slide(ImpressTarget(kind="slide", slide_index=1), 3)
+        session.delete_slide(ImpressTarget(kind="slide", slide_index=4))
         assert session.get_slide_count() == 5
 
         session.set_notes(
@@ -360,9 +360,9 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     snapshot_slide(str(session_doc), 2, str(snapshot_after))
 
-    atomic_doc = output_dir / "patch_atomic.odp"
-    create_presentation(str(atomic_doc))
-    with ImpressSession(str(atomic_doc)) as session:
+    atomic_success_doc = output_dir / "patch_atomic_success.odp"
+    create_presentation(str(atomic_success_doc))
+    with ImpressSession(str(atomic_success_doc)) as session:
         session.add_slide(layout="TITLE_AND_CONTENT")
         session.insert_text(
             "Atomic body",
@@ -370,7 +370,32 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         )
 
     patch(
-        str(atomic_doc),
+        str(atomic_success_doc),
+        "[operation]\n"
+        "type = replace_text\n"
+        "target.kind = text\n"
+        "target.slide_index = 1\n"
+        "target.placeholder = body\n"
+        "new_text = Atomic success text\n"
+        "[operation]\n"
+        "type = set_notes\n"
+        "target.kind = notes\n"
+        "target.slide_index = 1\n"
+        "text = Atomic success notes\n",
+        mode="atomic",
+    )
+
+    atomic_fail_doc = output_dir / "patch_atomic_fail.odp"
+    create_presentation(str(atomic_fail_doc))
+    with ImpressSession(str(atomic_fail_doc)) as session:
+        session.add_slide(layout="TITLE_AND_CONTENT")
+        session.insert_text(
+            "Atomic body",
+            ImpressTarget(kind="insertion", slide_index=1, placeholder="body"),
+        )
+
+    patch(
+        str(atomic_fail_doc),
         "[operation]\n"
         "type = replace_text\n"
         "target.kind = text\n"
@@ -427,7 +452,8 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
 
     return {
         "session_workflow": session_doc,
-        "patch_atomic": atomic_doc,
+        "patch_atomic_success": atomic_success_doc,
+        "patch_atomic_fail": atomic_fail_doc,
         "patch_best_effort": best_effort_doc,
         "workflow_pdf": workflow_pdf,
         "workflow_pptx": workflow_pptx,
@@ -498,9 +524,10 @@ def test_session_workflow_document_state(tmp_path):
             int(doc.DrawPages.getByIndex(index).Layout)
             for index in range(doc.DrawPages.Count)
         ]
-    assert layouts.count(TITLE_AND_CONTENT_LAYOUT) == 1
+    assert layouts[0] == layouts[3], "Slides 0 and 3 should be identical duplicates"
+    assert layouts.count(TITLE_AND_CONTENT_LAYOUT) >= 1
     assert layouts.count(TITLE_ONLY_LAYOUT) == 1
-    assert layouts.count(BLANK_LAYOUT) == 2
+    assert layouts.count(BLANK_LAYOUT) == 1
 
     for key in (
         "session_workflow",
@@ -518,11 +545,21 @@ def test_patch_workflow_documents_capture_atomic_and_best_effort_results(tmp_pat
     """Standalone patch workflow preserves atomic rollback and best-effort saves."""
     outputs = run_end_to_end_workflow(tmp_path)
 
+    # Atomic success: all ops applied
     assert (
-        get_shape_text(outputs["patch_atomic"], 1, placeholder="body") == "Atomic body"
+        get_shape_text(outputs["patch_atomic_success"], 1, placeholder="body")
+        == "Atomic success text"
     )
-    assert get_notes_text(outputs["patch_atomic"], 1) == ""
+    assert get_notes_text(outputs["patch_atomic_success"], 1) == "Atomic success notes"
 
+    # Atomic fail: rolled back, document unchanged from baseline
+    assert (
+        get_shape_text(outputs["patch_atomic_fail"], 1, placeholder="body")
+        == "Atomic body"
+    )
+    assert get_notes_text(outputs["patch_atomic_fail"], 1) == ""
+
+    # Best effort: valid ops applied, invalid ops skipped
     assert [
         item["text"]
         for item in get_list_paragraphs(

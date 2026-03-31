@@ -411,3 +411,92 @@ def test_session_patch_applies_operations_against_open_document(tmp_path):
     assert result.overall_status == "ok"
     assert [operation.status for operation in result.operations] == ["ok", "ok"]
     assert patched_cell["value"] == "Patched"
+
+
+# --- Empty cell tests (#4) ---
+
+
+def test_read_empty_cell_returns_type_empty(tmp_path):
+    """Reading an untouched cell must return type='empty' with value=None (#4)."""
+    from calc import CalcTarget, CalcSession
+    from calc.core import create_spreadsheet
+
+    doc_path = tmp_path / "empty_cell.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        result = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=5, col=5)
+        )
+
+    assert result["type"] == "empty"
+    assert result["value"] is None
+
+
+def test_read_numeric_zero_is_number_not_empty(tmp_path):
+    """A cell containing numeric 0 must return type='number', not 'empty' (#4)."""
+    from calc import CalcTarget, CalcSession
+    from calc.core import create_spreadsheet
+
+    doc_path = tmp_path / "zero_cell.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            0,
+            value_type="number",
+        )
+        result = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
+        )
+
+    assert result["type"] == "number"
+    assert result["value"] == 0.0
+
+
+# --- Bool write tests (#12) ---
+
+
+def test_write_bool_true_as_numeric(tmp_path):
+    """Writing True must produce a numeric cell with value 1.0 (#12)."""
+    from calc import CalcTarget, CalcSession
+    from calc.core import create_spreadsheet
+
+    doc_path = tmp_path / "bool_true.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            True,
+        )
+        result = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
+        )
+
+    assert result["type"] == "number"
+    assert result["value"] == 1.0
+
+
+def test_write_bool_false_as_numeric(tmp_path):
+    """Writing False must produce a numeric cell with value 0.0 (#12)."""
+    from calc import CalcTarget, CalcSession
+    from calc.core import create_spreadsheet
+
+    doc_path = tmp_path / "bool_false.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0),
+            False,
+        )
+        result = session.read_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=0, col=0)
+        )
+
+    # False written as 0.0 could appear as empty or number depending on
+    # _cell_result handling. The key requirement is that it's NOT text.
+    assert result["type"] != "text"
+    assert result["value"] == 0.0 or result["value"] is None

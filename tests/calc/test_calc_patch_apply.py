@@ -143,7 +143,8 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
         )
 
     assert preserved["value"] == "baseline"
-    assert untouched["value"] == 0.0
+    assert untouched["value"] is None
+    assert untouched["type"] == "empty"
 
 
 def test_patch_best_effort_mode_records_partial_success_and_persists_mutations(

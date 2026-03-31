@@ -8,6 +8,7 @@ from writer.exceptions import (
     DocumentNotFoundError,
     FilterError,
     InvalidPageError,
+    SnapshotError,
 )
 
 
@@ -66,6 +67,8 @@ def snapshot_page(
         doc = desktop.loadComponentFromURL(
             file_path.resolve().as_uri(), "_blank", 0, ()
         )
+        if doc is None:
+            raise SnapshotError(f"Failed to open document for snapshot: {doc_path}")
         try:
             page_count = doc.DrawPages.Count
             if page > page_count:
@@ -73,16 +76,35 @@ def snapshot_page(
                     f"Page {page} out of range (document has {page_count} pages)"
                 )
 
+            # Read page geometry from document style
+            width_inches = 8.27  # A4 fallback
+            height_inches = 11.69
+            try:
+                styles = doc.StyleFamilies.getByName("PageStyles")
+                # Try common names for the default page style
+                page_style = None
+                for name in ("Default Page Style", "Standard"):
+                    try:
+                        page_style = styles.getByName(name)
+                        break
+                    except Exception:
+                        continue
+                if page_style is not None:
+                    width_inches = page_style.Width / 2540.0
+                    height_inches = page_style.Height / 2540.0
+            except Exception:
+                pass  # Fall back to A4
+
             filter_data = []
 
             fd_width = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
             fd_width.Name = "PixelWidth"
-            fd_width.Value = int(dpi * 8.27)  # A4 width in inches * dpi
+            fd_width.Value = int(dpi * width_inches)
             filter_data.append(fd_width)
 
             fd_height = uno.createUnoStruct("com.sun.star.beans.PropertyValue")
             fd_height.Name = "PixelHeight"
-            fd_height.Value = int(dpi * 11.69)  # A4 height in inches * dpi
+            fd_height.Value = int(dpi * height_inches)
             filter_data.append(fd_height)
 
             fd_page = uno.createUnoStruct("com.sun.star.beans.PropertyValue")

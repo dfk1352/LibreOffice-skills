@@ -1,21 +1,28 @@
 """Custom exceptions for the Calc skill."""
 
-from exceptions import SessionClosedError
+from exceptions import (
+    DocumentNotFoundError as _BaseDocumentNotFoundError,
+    PatchOperationError as _BasePatchOperationError,
+    PatchSyntaxError as _BasePatchSyntaxError,
+    SessionClosedError,
+    SkillError,
+    SnapshotError as _BaseSnapshotError,
+)
 
 
-class CalcSkillError(Exception):
+class CalcSkillError(SkillError):
     """Base error for Calc skill."""
 
 
-class CalcSessionError(CalcSkillError):
+class CalcSessionError(CalcSkillError, SessionClosedError):
     """Error for Calc session lifecycle misuse."""
 
 
-class PatchSyntaxError(CalcSkillError):
+class PatchSyntaxError(CalcSkillError, _BasePatchSyntaxError):
     """Error for malformed Calc patch input."""
 
 
-class PatchOperationError(CalcSkillError):
+class PatchOperationError(CalcSkillError, _BasePatchOperationError):
     """Base error for parsed Calc patch operations."""
 
 
@@ -51,11 +58,11 @@ class ChartNotFoundError(PatchOperationError):
     """Error when a chart target cannot be resolved."""
 
 
-class DocumentNotFoundError(CalcSkillError):
+class DocumentNotFoundError(CalcSkillError, _BaseDocumentNotFoundError):
     """Error when spreadsheet file does not exist."""
 
 
-class SnapshotError(CalcSkillError):
+class SnapshotError(CalcSkillError, _BaseSnapshotError):
     """Base error for snapshot operations."""
 
 

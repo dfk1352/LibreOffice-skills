@@ -17,6 +17,7 @@ SHARED_FILES = [
     "colors.py",
     "session.py",
     "constants.py",
+    "patch_base.py",
 ]
 
 SKILL_SUBPACKAGE: dict[str, str] = {

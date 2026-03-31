@@ -30,7 +30,7 @@ with the UNO API directly.
 
 ## Who This Is For
 
-This skill suite targets **AI agents** that need to produce or modify real LibreOffice documents as part of their work. Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, etc. Any harness that's compatible with skills.
+This skill suite targets **AI agents** that need to produce or modify real LibreOffice documents as part of their work. Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, etc. Any harness that's compatible with [agent skills](https://agentskills.io/home).
 
 In other words, this skill suite is designed for users who want a well-tested, headless Python library on top of LibreOffice's UNO API, automating LibreOffice operations without building the infrastructure themselves.
 
@@ -43,15 +43,16 @@ Local first, free to use.
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.12+ | |
-| LibreOffice | 26.2+ | System-installed; headless mode used |
-| uv | any recent | Recommended package manager (for development only) |
+| LibreOffice | 26.2+ (recommended) | System-installed; headless mode used |
+| uv | Any recent | Package manager (recommended, for development only) |
 
 ### Installing LibreOffice
 
 Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate the LibreOffice binary, including versioned installs (e.g. `libreoffice26.2`). Some features, including Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
-For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
+The skill scans common spots to locate the LibreOffice binary. For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
+
+Some features, including Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
 
 ---
 
@@ -60,13 +61,7 @@ For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variab
 ### Via `npx skills`
 
 ```bash
-# All three skills at once
 npx skills add dfk1352/LibreOffice-skills
-
-# Or pick the ones you need
-npx skills add dfk1352/LibreOffice-skills --skill libreoffice-writer
-npx skills add dfk1352/LibreOffice-skills --skill libreoffice-calc
-npx skills add dfk1352/LibreOffice-skills --skill libreoffice-impress
 ```
 
 ### Via `npx openskills`
@@ -82,7 +77,7 @@ git clone https://github.com/dfk1352/LibreOffice-skills.git
 cd LibreOffice-skills
 uv sync
 
-# Rebuild the skills/*/scripts/ bundles from src/ (required after any src/ change)
+# Rebuild the skills/*/scripts/ bundles from src/ (after any src/ change)
 python scripts/sync_bundles.py
 ```
 

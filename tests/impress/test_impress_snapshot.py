@@ -110,3 +110,39 @@ def test_convert_to_pngs_raises_snapshot_error_on_timeout(tmp_path, monkeypatch)
 
     with pytest.raises(FilterError, match="timed out"):
         _convert_to_pngs(str(tmp_path / "dummy.odp"), tmp_path)
+
+
+def test_snapshot_slide_preserves_4_3_aspect_ratio(tmp_path):
+    """A 4:3 presentation must produce a non-distorted snapshot (#11).
+
+    Default presentations are 16:9 (25.4 x 14.29 cm).
+    A 4:3 presentation (25.4 x 19.05 cm) should produce an image
+    whose aspect ratio is closer to 4:3 than 16:9.
+    """
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+    from impress.snapshot import snapshot_slide
+
+    doc_path = tmp_path / "four_three.odp"
+    create_presentation(str(doc_path))
+
+    # Change slide size to 4:3 (25400 x 19050 in 1/100 mm)
+    with ImpressSession(str(doc_path)) as session:
+        page = session.doc.DrawPages.getByIndex(0)
+        page.Width = 25400  # 25.4 cm
+        page.Height = 19050  # 19.05 cm
+
+    out_path = tmp_path / "four_three_snap.png"
+    result = snapshot_slide(str(doc_path), 0, str(out_path))
+
+    assert out_path.exists()
+    assert result.width > 0
+    assert result.height > 0
+
+    # 4:3 ratio ≈ 1.333, 16:9 ratio ≈ 1.778
+    actual_ratio = result.width / result.height
+    four_three_ratio = 4.0 / 3.0
+    sixteen_nine_ratio = 16.0 / 9.0
+
+    # The image should be closer to 4:3 than 16:9
+    assert abs(actual_ratio - four_three_ratio) < abs(actual_ratio - sixteen_nine_ratio)

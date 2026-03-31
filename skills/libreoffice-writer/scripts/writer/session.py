@@ -63,7 +63,8 @@ class WriterSession(BaseSession):
         return self._doc
 
     def close(self, save: bool = True) -> None:
-        self._require_open()
+        if self._closed:
+            return
         try:
             if save:
                 self._doc.store()
@@ -331,10 +332,16 @@ class WriterSession(BaseSession):
                 0,
                 (),
             )
+            if self._doc is None:
+                raise DocumentNotFoundError(
+                    f"Failed to open Writer document: {self._path}"
+                )
         except Exception as exc:
             self._uno_manager.__exit__(type(exc), exc, exc.__traceback__)
             self._uno_manager = None
             self._desktop = None
+            if isinstance(exc, DocumentNotFoundError):
+                raise
             raise WriterSkillError(
                 f"Failed to open Writer document: {self._path}"
             ) from exc

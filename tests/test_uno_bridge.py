@@ -72,3 +72,27 @@ def test_resolve_uno_module_adds_env_path_and_checks_uno(monkeypatch, tmp_path):
     assert len(checks) >= 2
     assert str(env_path) not in checks[0]
     assert str(env_path) in checks[-1]
+
+
+def test_uno_context_does_not_retry_consumer_noconnectexception():
+    """NoConnectException raised inside the with-block must propagate, not retry (#7).
+
+    After the refactor, yield is outside the retry loop, so a
+    NoConnectException raised by consumer code inside the with-block
+    should propagate as-is rather than being caught by retry logic or
+    converted to UnoBridgeError.
+    """
+    from uno_bridge import uno_context, UnoBridgeError
+
+    with __import__("pytest").raises(Exception) as exc_info:
+        with uno_context() as desktop:
+            assert desktop is not None
+            from com.sun.star.connection import NoConnectException
+
+            raise NoConnectException("simulated consumer error", None)
+
+    # The key assertion: the exception must NOT be an UnoBridgeError.
+    # If it were, the retry loop swallowed the consumer's exception.
+    assert not isinstance(exc_info.value, UnoBridgeError), (
+        f"Consumer NoConnectException was converted to UnoBridgeError: {exc_info.value}"
+    )

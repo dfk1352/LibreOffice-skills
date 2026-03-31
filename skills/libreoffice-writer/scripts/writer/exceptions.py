@@ -1,17 +1,24 @@
 """Custom exceptions for Writer skill."""
 
-from exceptions import SessionClosedError
+from exceptions import (
+    DocumentNotFoundError as _BaseDocumentNotFoundError,
+    PatchOperationError as _BasePatchOperationError,
+    PatchSyntaxError as _BasePatchSyntaxError,
+    SessionClosedError,
+    SkillError,
+    SnapshotError as _BaseSnapshotError,
+)
 
 
-class WriterSkillError(Exception):
+class WriterSkillError(SkillError):
     """Base error for Writer skill."""
 
 
-class WriterSessionError(WriterSkillError):
+class WriterSessionError(WriterSkillError, SessionClosedError):
     """Error for Writer session lifecycle misuse."""
 
 
-class DocumentNotFoundError(WriterSkillError):
+class DocumentNotFoundError(WriterSkillError, _BaseDocumentNotFoundError):
     """Error when document file is not found."""
 
 
@@ -19,11 +26,11 @@ class InvalidMetadataError(WriterSkillError):
     """Error for invalid metadata parameters."""
 
 
-class PatchSyntaxError(WriterSkillError):
+class PatchSyntaxError(WriterSkillError, _BasePatchSyntaxError):
     """Error for malformed Writer patch input."""
 
 
-class PatchOperationError(WriterSkillError):
+class PatchOperationError(WriterSkillError, _BasePatchOperationError):
     """Base error for parsed Writer patch operations."""
 
 
@@ -59,7 +66,7 @@ class InvalidPayloadError(PatchOperationError):
     """Error when patch payload data is invalid for the target."""
 
 
-class SnapshotError(WriterSkillError):
+class SnapshotError(WriterSkillError, _BaseSnapshotError):
     """Base error for snapshot operations."""
 
 

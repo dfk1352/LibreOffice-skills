@@ -191,6 +191,45 @@ def _find_program_dir() -> str | None:
     return None
 
 
+def _connect_with_retry(
+    resolver: Any,
+    connection_string: str,
+    max_retries: int = 50,
+    delay: float = 0.2,
+) -> Any:
+    """Connect to a running LibreOffice instance with retries.
+
+    Args:
+        resolver: UNO URL resolver instance.
+        connection_string: Pipe or socket connection string.
+        max_retries: Maximum connection attempts.
+        delay: Seconds between attempts.
+
+    Returns:
+        The Desktop service proxy.
+
+    Raises:
+        UnoBridgeError: If all retries are exhausted.
+    """
+    from com.sun.star.connection import NoConnectException
+
+    for attempt in range(max_retries):
+        try:
+            ctx = resolver.resolve(
+                f"uno:{connection_string};urp;StarOffice.ComponentContext"
+            )
+            smgr = ctx.ServiceManager
+            return smgr.createInstanceWithContext("com.sun.star.frame.Desktop", ctx)
+        except NoConnectException:
+            if attempt == max_retries - 1:
+                raise UnoBridgeError(
+                    f"Failed to connect to LibreOffice after {max_retries} attempts"
+                )
+            time.sleep(delay)
+    # Unreachable, but satisfies type checkers.
+    raise UnoBridgeError("Failed to connect to LibreOffice")
+
+
 @contextmanager
 def uno_context() -> Generator[Any, None, None]:
     """Context manager for UNO connection to LibreOffice.
@@ -212,7 +251,6 @@ def uno_context() -> Generator[Any, None, None]:
     _resolve_uno_module(soffice_path)
 
     import uno
-    from com.sun.star.connection import NoConnectException
 
     pipe_name = f"uno_pipe_{os.getpid()}_{int(time.time() * 1000)}"
     connection_string = f"pipe,name={pipe_name}"
@@ -242,24 +280,8 @@ def uno_context() -> Generator[Any, None, None]:
             "com.sun.star.bridge.UnoUrlResolver", local_context
         )
 
-        max_retries = 50
-        for attempt in range(max_retries):
-            try:
-                ctx = resolver.resolve(
-                    f"uno:{connection_string};urp;StarOffice.ComponentContext"
-                )
-                smgr = ctx.ServiceManager
-                desktop = smgr.createInstanceWithContext(
-                    "com.sun.star.frame.Desktop", ctx
-                )
-                yield desktop
-                break
-            except NoConnectException:
-                if attempt == max_retries - 1:
-                    raise UnoBridgeError(
-                        f"Failed to connect to LibreOffice after {max_retries} attempts"
-                    )
-                time.sleep(0.2)
+        desktop = _connect_with_retry(resolver, connection_string)
+        yield desktop
     finally:
         try:
             process.terminate()

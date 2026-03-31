@@ -143,3 +143,89 @@ def test_parse_patch_invalid_json_payload_raises_patch_syntax_error(key):
 
     with pytest.raises(PatchSyntaxError):
         parse_patch(payload_block)
+
+
+# --- Numeric coercion tests (#2) ---
+
+
+def test_parse_patch_font_size_coerced_to_float():
+    """format.font_size = 14 must produce float(14.0), not the string '14' (#2)."""
+    from writer.patch import parse_patch
+
+    operations = parse_patch(
+        "[operation]\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = hello\n"
+        "format.font_size = 14\n"
+    )
+
+    formatting = operations[0].payload["formatting"]
+    assert formatting.font_size == 14.0
+    assert isinstance(formatting.font_size, float)
+
+
+def test_parse_patch_line_spacing_coerced_to_float():
+    """format.line_spacing = 1.5 must produce float(1.5) (#2)."""
+    from writer.patch import parse_patch
+
+    operations = parse_patch(
+        "[operation]\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = hello\n"
+        "format.line_spacing = 1.5\n"
+    )
+
+    formatting = operations[0].payload["formatting"]
+    assert formatting.line_spacing == 1.5
+    assert isinstance(formatting.line_spacing, float)
+
+
+def test_parse_patch_spacing_before_coerced_to_int():
+    """format.spacing_before = 200 must produce int(200) (#2)."""
+    from writer.patch import parse_patch
+
+    operations = parse_patch(
+        "[operation]\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = hello\n"
+        "format.spacing_before = 200\n"
+    )
+
+    formatting = operations[0].payload["formatting"]
+    assert formatting.spacing_before == 200
+    assert isinstance(formatting.spacing_before, int)
+
+
+def test_parse_patch_spacing_after_coerced_to_int():
+    """format.spacing_after = 100 must produce int(100) (#2)."""
+    from writer.patch import parse_patch
+
+    operations = parse_patch(
+        "[operation]\n"
+        "type = format_text\n"
+        "target.kind = text\n"
+        "target.text = hello\n"
+        "format.spacing_after = 100\n"
+    )
+
+    formatting = operations[0].payload["formatting"]
+    assert formatting.spacing_after == 100
+    assert isinstance(formatting.spacing_after, int)
+
+
+def test_parse_patch_invalid_font_size_raises():
+    """format.font_size = not_a_number must raise PatchSyntaxError (#2)."""
+    from writer.exceptions import PatchSyntaxError
+    from writer.patch import parse_patch
+
+    with pytest.raises(PatchSyntaxError):
+        parse_patch(
+            "[operation]\n"
+            "type = format_text\n"
+            "target.kind = text\n"
+            "target.text = hello\n"
+            "format.font_size = not_a_number\n"
+        )

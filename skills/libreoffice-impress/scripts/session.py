@@ -20,7 +20,7 @@ class BaseSession(ABC):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
-        self.close(save=True)
+        self.close(save=(exc_type is None))
         return False
 
     @abstractmethod

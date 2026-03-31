@@ -1,9 +1,22 @@
 """Patch parsing and application for Calc spreadsheets."""
 
-import json
-from dataclasses import dataclass
-from typing import Any, Literal
+from __future__ import annotations
 
+from typing import Any
+
+import patch_base
+from patch_base import (
+    PatchApplyMode,
+    PatchApplyResult,
+    PatchOperation,
+    PatchOperationResult,
+    coerce_bool,
+    coerce_float,
+    coerce_int,
+    coerce_json,
+    require_payload_keys,
+    require_target,
+)
 from calc.exceptions import PatchSyntaxError
 from calc.targets import (
     CalcTarget,
@@ -12,8 +25,6 @@ from calc.targets import (
     ValidationRule,
     parse_target,
 )
-
-PatchApplyMode = Literal["atomic", "best_effort"]
 
 _OPERATION_TYPES = {
     "write_cell",
@@ -31,9 +42,20 @@ _OPERATION_TYPES = {
     "delete_chart",
     "recalculate",
 }
-_TARGET_INT_KEYS = {"sheet_index", "row", "col", "end_row", "end_col", "index"}
+_TARGET_INT_KEYS = {
+    "sheet_index",
+    "row",
+    "col",
+    "end_row",
+    "end_col",
+    "index",
+}
 _FORMAT_BOOL_KEYS = {"format.bold", "format.italic"}
-_RULE_BOOL_KEYS = {"rule.show_error", "rule.show_input", "rule.ignore_blank"}
+_RULE_BOOL_KEYS = {
+    "rule.show_error",
+    "rule.show_input",
+    "rule.ignore_blank",
+}
 _RULE_INT_KEYS = {"rule.error_style"}
 _CHART_INT_KEYS = {
     "chart.anchor_row",
@@ -41,129 +63,42 @@ _CHART_INT_KEYS = {
     "chart.width",
     "chart.height",
 }
-_CHART_RANGE_INT_KEYS = {"row", "col", "end_row", "end_col", "sheet_index", "index"}
+_CHART_RANGE_INT_KEYS = {
+    "row",
+    "col",
+    "end_row",
+    "end_col",
+    "sheet_index",
+    "index",
+}
 
-
-@dataclass(frozen=True)
-class PatchOperation:
-    """Parsed Calc patch operation."""
-
-    operation_type: str
-    target: CalcTarget | None
-    payload: dict[str, Any]
-
-
-@dataclass
-class PatchOperationResult:
-    """Result for one patch operation."""
-
-    operation_type: str
-    target: CalcTarget | None
-    status: str
-    error: str | None
-    mutated: bool
-
-
-@dataclass
-class PatchApplyResult:
-    """Aggregate patch application result."""
-
-    mode: PatchApplyMode
-    overall_status: str
-    operations: list[PatchOperationResult]
-    document_persisted: bool
+_E = PatchSyntaxError
 
 
 def parse_patch(patch_text: str) -> list[PatchOperation]:
     """Parse Calc patch text into ordered operations."""
-    blocks = _parse_blocks(patch_text)
-    operations: list[PatchOperation] = []
-    for block in blocks:
-        operation_type = block.get("type")
-        if operation_type is None:
-            raise PatchSyntaxError("Operation block is missing type")
-        if operation_type not in _OPERATION_TYPES:
-            raise PatchSyntaxError(f"Unknown operation type: {operation_type}")
-
-        target_fields = {
-            key.split(".", 1)[1]: _coerce_target_value(key.split(".", 1)[1], value)
-            for key, value in block.items()
-            if key.startswith("target.")
-        }
-        target = parse_target(target_fields) if target_fields else None
-        payload = _parse_payload(operation_type, block)
-        _validate_operation_shape(operation_type, target, payload)
-        operations.append(
-            PatchOperation(
-                operation_type=operation_type,
-                target=target,
-                payload=payload,
-            )
-        )
-    return operations
+    return patch_base.parse_patch(
+        patch_text,
+        operation_types=_OPERATION_TYPES,
+        target_int_keys=_TARGET_INT_KEYS,
+        parse_target_fn=parse_target,
+        parse_payload_fn=_parse_payload,
+        validate_fn=_validate_operation_shape,
+        error_cls=_E,
+    )
 
 
 def apply_operations(
-    session, patch_text: str, mode: PatchApplyMode
+    session: Any, patch_text: str, mode: PatchApplyMode
 ) -> PatchApplyResult:
     """Apply patch operations to an already-open Calc session."""
-    if mode not in ("atomic", "best_effort"):
-        raise PatchSyntaxError(f"Unsupported patch mode: {mode}")
-
-    operations = parse_patch(patch_text)
-    results: list[PatchOperationResult] = []
-    atomic_snapshot = session._path.read_bytes() if mode == "atomic" else None
-
-    for index, operation in enumerate(operations):
-        try:
-            _dispatch_operation(session, operation)
-            results.append(
-                PatchOperationResult(
-                    operation_type=operation.operation_type,
-                    target=operation.target,
-                    status="ok",
-                    error=None,
-                    mutated=True,
-                )
-            )
-        except Exception as exc:
-            results.append(
-                PatchOperationResult(
-                    operation_type=operation.operation_type,
-                    target=operation.target,
-                    status="failed",
-                    error=str(exc),
-                    mutated=False,
-                )
-            )
-            if mode == "atomic":
-                for skipped in operations[index + 1 :]:
-                    results.append(
-                        PatchOperationResult(
-                            operation_type=skipped.operation_type,
-                            target=skipped.target,
-                            status="skipped",
-                            error="Skipped because an earlier atomic operation failed",
-                            mutated=False,
-                        )
-                    )
-                assert atomic_snapshot is not None
-                session.restore_snapshot(atomic_snapshot)
-                return PatchApplyResult(
-                    mode=mode,
-                    overall_status="failed",
-                    operations=results,
-                    document_persisted=False,
-                )
-
-    overall_status = "ok"
-    if any(result.status == "failed" for result in results):
-        overall_status = "partial"
-    return PatchApplyResult(
-        mode=mode,
-        overall_status=overall_status,
-        operations=results,
-        document_persisted=False,
+    return patch_base.apply_operations(
+        session,
+        patch_text,
+        mode,
+        parse_patch_fn=parse_patch,
+        dispatch_fn=_dispatch_operation,
+        error_cls=_E,
     )
 
 
@@ -173,21 +108,19 @@ def patch(
     """Open a session, apply a patch, and persist if appropriate."""
     from calc.session import CalcSession
 
-    session = CalcSession(path)
-    try:
-        result = apply_operations(session, patch_text, mode)
-        should_save = result.overall_status != "failed" and any(
-            operation.mutated for operation in result.operations
-        )
-        session.close(save=should_save)
-        result.document_persisted = should_save
-        return result
-    finally:
-        if not session._closed:
-            session.close(save=False)
+    return patch_base.patch(
+        path,
+        patch_text,
+        mode,
+        session_cls=CalcSession,
+        apply_fn=apply_operations,
+    )
 
 
-def _dispatch_operation(session, operation: PatchOperation) -> None:
+# ---- App-specific helpers ------------------------------------------------
+
+
+def _dispatch_operation(session: Any, operation: PatchOperation) -> None:
     if operation.operation_type == "write_cell":
         session.write_cell(
             operation.target,
@@ -203,7 +136,8 @@ def _dispatch_operation(session, operation: PatchOperation) -> None:
         return
     if operation.operation_type == "add_sheet":
         session.add_sheet(
-            operation.payload["name"], index=operation.payload.get("index")
+            operation.payload["name"],
+            index=operation.payload.get("index"),
         )
         return
     if operation.operation_type == "rename_sheet":
@@ -236,50 +170,7 @@ def _dispatch_operation(session, operation: PatchOperation) -> None:
     if operation.operation_type == "recalculate":
         session.recalculate()
         return
-    raise PatchSyntaxError(f"Unsupported operation type: {operation.operation_type}")
-
-
-def _parse_blocks(patch_text: str) -> list[dict[str, str]]:
-    lines = patch_text.splitlines()
-    current: dict[str, str] | None = None
-    blocks: list[dict[str, str]] = []
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            index += 1
-            continue
-        if stripped == "[operation]":
-            if current is not None:
-                blocks.append(current)
-            current = {}
-            index += 1
-            continue
-        if current is None:
-            raise PatchSyntaxError("Patch content must be inside [operation] blocks")
-        if "<<" in stripped:
-            key, marker = stripped.split("<<", 1)
-            end_marker = marker.strip()
-            value_lines: list[str] = []
-            index += 1
-            while index < len(lines) and lines[index].strip() != end_marker:
-                value_lines.append(lines[index])
-                index += 1
-            if index >= len(lines):
-                raise PatchSyntaxError(f"Unterminated heredoc for key: {key.strip()}")
-            current[key.strip()] = "\n".join(value_lines)
-            index += 1
-            continue
-        if "=" not in stripped:
-            raise PatchSyntaxError(f"Invalid patch line: {line}")
-        key, value = stripped.split("=", 1)
-        current[key.strip()] = value.strip()
-        index += 1
-
-    if current is not None:
-        blocks.append(current)
-    return blocks
+    raise _E(f"Unsupported operation type: {operation.operation_type}")
 
 
 def _parse_payload(operation_type: str, block: dict[str, str]) -> dict[str, Any]:
@@ -288,10 +179,10 @@ def _parse_payload(operation_type: str, block: dict[str, str]) -> dict[str, Any]
         if key == "type" or key.startswith("target."):
             continue
         if key == "data":
-            payload[key] = _coerce_json(raw_value, key)
+            payload[key] = coerce_json(raw_value, key, _E)
             continue
         if key == "index":
-            payload[key] = _coerce_int(raw_value, key)
+            payload[key] = coerce_int(raw_value, key, _E)
             continue
         if key.startswith("format."):
             payload[key] = _coerce_format_value(key, raw_value)
@@ -323,23 +214,23 @@ def _validate_operation_shape(
 ) -> None:
     has_target = target is not None
     if operation_type == "write_cell":
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"value"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"value"}, _E)
         return
     if operation_type == "write_range":
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"data"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"data"}, _E)
         return
     if operation_type == "format_range":
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"formatting"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"formatting"}, _E)
         return
     if operation_type == "add_sheet":
-        _require_payload_keys(operation_type, payload, {"name"})
+        require_payload_keys(operation_type, payload, {"name"}, _E)
         return
     if operation_type == "rename_sheet":
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"new_name"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"new_name"}, _E)
         return
     if operation_type in {
         "delete_sheet",
@@ -347,19 +238,19 @@ def _validate_operation_shape(
         "clear_validation",
         "delete_chart",
     }:
-        _require_target(operation_type, has_target)
+        require_target(operation_type, has_target, _E)
         return
     if operation_type == "define_named_range":
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"name"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"name"}, _E)
         return
     if operation_type == "set_validation":
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"rule"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"rule"}, _E)
         return
     if operation_type in {"create_chart", "update_chart"}:
-        _require_target(operation_type, has_target)
-        _require_payload_keys(operation_type, payload, {"spec"})
+        require_target(operation_type, has_target, _E)
+        require_payload_keys(operation_type, payload, {"spec"}, _E)
         return
 
 
@@ -383,7 +274,7 @@ def _build_validation_rule(payload: dict[str, Any]) -> ValidationRule:
             missing.append("rule.type")
         if condition is None:
             missing.append("rule.condition")
-        raise PatchSyntaxError(
+        raise _E(
             f"Operation set_validation is missing required keys: {', '.join(missing)}"
         )
     return ValidationRule(
@@ -408,7 +299,7 @@ def _build_chart_spec(payload: dict[str, Any]) -> ChartSpec:
         if key.startswith("chart.data_range.")
     }
     if not data_range_fields:
-        raise PatchSyntaxError("Chart operations require chart.data_range.* fields")
+        raise _E("Chart operations require chart.data_range.* fields")
 
     return ChartSpec(
         chart_type=str(payload.get("chart.chart_type", "")),
@@ -421,35 +312,29 @@ def _build_chart_spec(payload: dict[str, Any]) -> ChartSpec:
     )
 
 
-def _coerce_target_value(field: str, value: str) -> Any:
-    if field in _TARGET_INT_KEYS:
-        return _coerce_int(value, f"target.{field}")
-    return value
-
-
 def _coerce_format_value(key: str, value: str) -> Any:
     if key in _FORMAT_BOOL_KEYS:
-        return _coerce_bool(value, key)
+        return coerce_bool(value, key, _E)
     if key == "format.font_size":
-        return _coerce_float(value, key)
+        return coerce_float(value, key, _E)
     return value
 
 
 def _coerce_rule_value(key: str, value: str) -> Any:
     if key in _RULE_BOOL_KEYS:
-        return _coerce_bool(value, key)
+        return coerce_bool(value, key, _E)
     if key in _RULE_INT_KEYS:
-        return _coerce_int(value, key)
+        return coerce_int(value, key, _E)
     return _coerce_scalar(value)
 
 
 def _coerce_chart_value(key: str, value: str) -> Any:
     if key in _CHART_INT_KEYS:
-        return _coerce_int(value, key)
+        return coerce_int(value, key, _E)
     if key.startswith("chart.data_range."):
         field = key.split(".", 2)[2]
         if field in _CHART_RANGE_INT_KEYS:
-            return _coerce_int(value, key)
+            return coerce_int(value, key, _E)
     return value
 
 
@@ -469,57 +354,10 @@ def _coerce_scalar(value: str) -> Any:
         return value
 
 
-def _coerce_int(value: str, key: str) -> int:
-    try:
-        return int(value)
-    except ValueError as exc:
-        raise PatchSyntaxError(f"{key} must be an integer") from exc
-
-
-def _coerce_float(value: str, key: str) -> float:
-    try:
-        return float(value)
-    except ValueError as exc:
-        raise PatchSyntaxError(f"{key} must be a number") from exc
-
-
-def _coerce_bool(value: str, key: str) -> bool:
-    lowered = value.strip().lower()
-    if lowered == "true":
-        return True
-    if lowered == "false":
-        return False
-    raise PatchSyntaxError(f"{key} must be true or false")
-
-
-def _coerce_json(value: str, key: str) -> Any:
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError as exc:
-        raise PatchSyntaxError(f"{key} must be valid JSON") from exc
-
-
-def _require_target(operation_type: str, has_target: bool) -> None:
-    if not has_target:
-        raise PatchSyntaxError(f"Operation {operation_type} requires target.* fields")
-
-
-def _require_payload_keys(
-    operation_type: str, payload: dict[str, Any], keys: set[str]
-) -> None:
-    missing = [
-        key for key in sorted(keys) if key not in payload or payload[key] is None
-    ]
-    if missing:
-        raise PatchSyntaxError(
-            f"Operation {operation_type} is missing required keys: {', '.join(missing)}"
-        )
-
-
 def _require_int_payload(payload: dict[str, Any], key: str) -> int:
     value = payload.get(key)
     if not isinstance(value, int):
-        raise PatchSyntaxError(f"{key} must be an integer")
+        raise _E(f"{key} must be an integer")
     return value
 
 

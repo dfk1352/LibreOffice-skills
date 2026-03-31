@@ -56,7 +56,8 @@ class CalcSession(BaseSession):
         return self._doc
 
     def close(self, save: bool = True) -> None:
-        self._require_open()
+        if self._closed:
+            return
         try:
             if save:
                 self._doc.store()
@@ -119,7 +120,7 @@ class CalcSession(BaseSession):
         if normalized_type != "auto":
             raise InvalidPayloadError(f"Unsupported value_type: {value_type}")
         if isinstance(value, bool):
-            cell.String = str(value)
+            cell.Value = 1.0 if value else 0.0
         elif isinstance(value, (int, float)):
             cell.Value = float(value)
         elif value is None:
@@ -163,7 +164,7 @@ class CalcSession(BaseSession):
             for col_index, value in enumerate(row_values):
                 cell = cell_range.getCellByPosition(col_index, row_index)
                 if isinstance(value, bool):
-                    cell.String = str(value)
+                    cell.Value = 1.0 if value else 0.0
                 elif isinstance(value, (int, float)):
                     cell.Value = float(value)
                 elif value is None:
@@ -380,10 +381,16 @@ class CalcSession(BaseSession):
                 0,
                 (),
             )
+            if self._doc is None:
+                raise DocumentNotFoundError(
+                    f"Failed to open Calc document: {self._path}"
+                )
         except Exception as exc:
             self._uno_manager.__exit__(type(exc), exc, exc.__traceback__)
             self._uno_manager = None
             self._desktop = None
+            if isinstance(exc, DocumentNotFoundError):
+                raise
             raise CalcSessionError(
                 f"Failed to open Calc document: {self._path}"
             ) from exc
@@ -414,6 +421,15 @@ def _cell_result(cell: Any) -> dict[str, object]:
             "error": None,
             "type": "text",
             "raw": cell.String,
+        }
+    # UNO CellContentType.EMPTY has int value 0.
+    if cell.Type.value in (0, "EMPTY"):
+        return {
+            "value": None,
+            "formula": None,
+            "error": None,
+            "type": "empty",
+            "raw": None,
         }
     return {
         "value": cell.Value,
