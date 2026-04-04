@@ -100,6 +100,8 @@ class ChartSpec:
     width: int
     height: int
     title: str | None = None
+    has_column_headers: bool = True
+    has_row_headers: bool = True
 
 
 def parse_target(raw: dict[str, Any]) -> CalcTarget:

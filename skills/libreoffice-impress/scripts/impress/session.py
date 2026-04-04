@@ -3,8 +3,9 @@
 # pyright: reportMissingImports=false, reportAttributeAccessIssue=false, reportArgumentType=false, reportGeneralTypeIssues=false
 
 import warnings
-from pathlib import Path
 from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal, cast
 
 from colors import resolve_color
@@ -76,6 +77,21 @@ _TEXT_DELETE_KINDS = {"text", "notes"}
 _SHAPE_DELETE_KINDS = {"shape", "image", "table", "chart", "media"}
 
 
+@dataclass(frozen=True)
+class MasterPageImportResult:
+    """Result of importing a master page.
+
+    Attributes:
+        master_name: The name of the imported master page in the active document.
+        copied_shape_count: Number of non-placeholder shapes successfully copied.
+        warnings: List of issues encountered during partial copy (e.g. background properties).
+    """
+
+    master_name: str
+    copied_shape_count: int
+    warnings: list[str]
+
+
 class ImpressSession(BaseSession):
     """Long-lived Impress editing session bound to one presentation."""
 
@@ -85,52 +101,12 @@ class ImpressSession(BaseSession):
         if not self._path.exists():
             raise DocumentNotFoundError(f"Document not found: {path}")
 
-        self._uno_manager: Any = None
-        self._desktop: Any = None
-        self._doc: Any = None
         self._open_document()
 
     @property
     def doc(self) -> Any:
         self._require_open()
         return self._doc
-
-    def close(self, save: bool = True) -> None:
-        if self._closed:
-            return
-        try:
-            if save:
-                self._doc.store()
-            self._doc.close(save)
-        finally:
-            try:
-                self._uno_manager.__exit__(None, None, None)
-            finally:
-                self._closed = True
-                self._doc = None
-                self._desktop = None
-                self._uno_manager = None
-
-    def reset(self) -> None:
-        self._require_open()
-        self._doc.close(False)
-        self._uno_manager.__exit__(None, None, None)
-        try:
-            self._open_document()
-        except Exception:
-            self._closed = True
-            raise
-
-    def restore_snapshot(self, snapshot: bytes) -> None:
-        self._require_open()
-        self._doc.close(False)
-        self._uno_manager.__exit__(None, None, None)
-        self._path.write_bytes(snapshot)
-        try:
-            self._open_document()
-        except Exception:
-            self._closed = True
-            raise
 
     def get_slide_count(self) -> int:
         self._require_open()
@@ -215,8 +191,6 @@ class ImpressSession(BaseSession):
         validate_list_items(items)
         cursor = resolve_insertion_point(target, self._doc)
         _insert_list_at_cursor(cursor.getText(), cursor, items, ordered)
-        self._doc.store()
-        self.reset()
 
     def replace_list(
         self,
@@ -229,8 +203,6 @@ class ImpressSession(BaseSession):
         paragraphs = resolve_list_target(target, self._doc)
         ordered_value = _list_is_ordered(paragraphs) if ordered is None else ordered
         _rewrite_list_block(target, paragraphs, items, ordered_value, self._doc)
-        self._doc.store()
-        self.reset()
 
     def insert_text_box(
         self,
@@ -287,8 +259,6 @@ class ImpressSession(BaseSession):
             _rewrite_list_block(
                 target, resolve_list_target(target, self._doc), [], False, self._doc
             )
-            self._doc.store()
-            self.reset()
             return
         if target.kind in _SHAPE_DELETE_KINDS:
             _delete_shape_like_target(self, target)
@@ -427,18 +397,6 @@ class ImpressSession(BaseSession):
             _set_shape_geometry(shape, placement)
         _update_chart_shape(shape, chart_type=chart_type, data=data, title=title)
         self._doc.store()
-        self.reset()
-        if (
-            chart_type is not None
-            or data is not None
-            or title is not None
-            or placement is not None
-        ):
-            shape = resolve_shape_target(target, self._doc)
-            if placement is not None:
-                _set_shape_geometry(shape, placement)
-            _update_chart_shape(shape, chart_type=chart_type, data=data, title=title)
-            self._doc.store()
 
     def insert_media(
         self,
@@ -511,7 +469,7 @@ class ImpressSession(BaseSession):
         background.FillColor = resolve_color(color)
         master_page.Background = background
 
-    def import_master_page(self, template_path: str) -> str:
+    def import_master_page(self, template_path: str) -> MasterPageImportResult:
         self._require_open()
         template_file = Path(template_path)
         if not template_file.exists():
@@ -527,6 +485,7 @@ class ImpressSession(BaseSession):
         try:
             src_master = template_doc.MasterPages.getByIndex(0)
             imported_name = str(src_master.Name)
+            copy_errors: list[str] = []
 
             # Find or create target master page
             masters = self._doc.MasterPages
@@ -561,16 +520,17 @@ class ImpressSession(BaseSession):
                     try:
                         val = src_bg.getPropertyValue(prop)
                         tgt_bg.setPropertyValue(prop, val)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        copy_errors.append(f"background {prop}: {exc}")
 
             # Copy layout if available
             try:
                 target_master.Layout = src_master.Layout
-            except Exception:
-                pass
+            except Exception as exc:
+                copy_errors.append(f"layout: {exc}")
 
             # Copy non-placeholder shapes from source master
+            copied_shapes = 0
             for i in range(src_master.Count):
                 src_shape = src_master.getByIndex(i)
                 if _is_placeholder_shape(src_shape):
@@ -580,11 +540,12 @@ class ImpressSession(BaseSession):
                     new_shape.Size = src_shape.Size
                     new_shape.Position = src_shape.Position
                     target_master.add(new_shape)
+                    copied_shapes += 1
                     # Copy text
                     try:
                         new_shape.setString(src_shape.getString())
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        copy_errors.append(f"shape {i} text: {exc}")
                     # Copy visual properties
                     for prop in (
                         "FillStyle",
@@ -599,13 +560,19 @@ class ImpressSession(BaseSession):
                     ):
                         try:
                             setattr(new_shape, prop, getattr(src_shape, prop))
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                        except Exception as exc:
+                            copy_errors.append(f"shape {i} property {prop}: {exc}")
+                except Exception as exc:
+                    raise ImpressSkillError(
+                        f"Failed to import master page '{imported_name}': shape {i} copy failed: {exc}"
+                    ) from exc
         finally:
             template_doc.close(True)
-        return imported_name
+        return MasterPageImportResult(
+            master_name=imported_name,
+            copied_shape_count=copied_shapes,
+            warnings=copy_errors,
+        )
 
     def export(self, output_path: str, export_format: str) -> None:
         self._require_open()
@@ -633,6 +600,7 @@ class ImpressSession(BaseSession):
     def _open_document(self) -> None:
         self._uno_manager = uno_context()
         self._desktop = self._uno_manager.__enter__()
+        assert self._path is not None
         try:
             self._doc = self._desktop.loadComponentFromURL(
                 self._path.resolve().as_uri(),
@@ -654,6 +622,7 @@ class ImpressSession(BaseSession):
             raise ImpressSkillError(
                 f"Failed to open Impress document: {self._path}"
             ) from exc
+        self._closed = False
 
 
 def _shape_summary(shape: Any, index: int) -> dict[str, object]:
@@ -1390,12 +1359,14 @@ def _copy_rich_text(src_shape: Any, dst_shape: Any) -> None:
                     except Exception:
                         pass
                 cursor.goRight(len(text_str), False)
-    except Exception:
+    except Exception as exc:
         # Fallback to plain text
         try:
             dst_shape.setString(src_shape.getString())
-        except Exception:
-            pass
+        except Exception as fallback_exc:
+            raise ImpressSkillError(
+                f"Failed to copy shape text content: {exc}; fallback failed: {fallback_exc}"
+            ) from fallback_exc
 
 
 def _table_payload_from_shape(shape: Any) -> tuple[int, int, list[list[str]]]:
@@ -1443,8 +1414,44 @@ def _chart_type_from_shape(shape: Any) -> str:
 
 
 def _chart_data_from_shape(shape: Any) -> list[list[object]]:
-    title = _chart_title_from_shape(shape) or "Value"
-    return [["Category", "Value"], [title, 1]]
+    embedded_object = getattr(shape, "EmbeddedObject", None)
+    chart_doc = embedded_object.Component if embedded_object is not None else None
+    if chart_doc is None:
+        raise InvalidPayloadError("Chart document is unavailable for slide copy")
+
+    chart_data = chart_doc.getData()
+    column_descriptions = [str(value) for value in chart_data.getColumnDescriptions()]
+    row_descriptions = [str(value) for value in chart_data.getRowDescriptions()]
+    values = [list(row) for row in chart_data.getData()]
+    data_row_source = _chart_data_row_source(chart_doc)
+
+    if data_row_source == "ROWS":
+        header: list[object] = ["Category"] + cast(list[object], row_descriptions)
+        rows: list[list[object]] = []
+        for column_index, label in enumerate(column_descriptions):
+            row: list[object] = [label]
+            for series in values:
+                row.append(series[column_index] if column_index < len(series) else 0.0)
+            rows.append(row)
+        return [header] + rows
+
+    header_cols: list[object] = ["Category"] + cast(list[object], row_descriptions)
+    rows_cols: list[list[object]] = []
+    for column_index, label in enumerate(column_descriptions):
+        row_cols: list[object] = [label]
+        for series in values:
+            row_cols.append(series[column_index] if column_index < len(series) else 0.0)
+        rows_cols.append(row_cols)
+    return [header_cols] + rows_cols
+
+
+def _chart_data_row_source(chart_doc: Any) -> str:
+    try:
+        value = chart_doc.getDiagram().DataRowSource
+    except Exception:
+        return "COLUMNS"
+    normalized = getattr(value, "value", value)
+    return str(normalized)
 
 
 def _media_url_from_shape(shape: Any) -> str:

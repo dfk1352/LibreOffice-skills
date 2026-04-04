@@ -94,3 +94,9 @@ def test_catch_skill_error_catches_any_app_error():
 
     with __import__("pytest").raises(SkillError):
         raise PatchSyntaxError("test message")
+
+
+def test_uno_bridge_error_is_skill_error():
+    from exceptions import SkillError, UnoBridgeError
+
+    assert issubclass(UnoBridgeError, SkillError)

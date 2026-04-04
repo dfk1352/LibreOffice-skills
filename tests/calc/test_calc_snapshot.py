@@ -219,3 +219,150 @@ def test_snapshot_area_with_nondefault_column_widths(tmp_path):
     assert out_path.exists()
     assert result.width > 0
     assert result.height > 0
+
+
+def test_snapshot_area_none_dimensions_include_used_range(tmp_path):
+    from calc import CalcTarget, CalcSession
+    from calc.core import create_spreadsheet
+    from calc.snapshot import snapshot_area
+
+    doc_path = tmp_path / "used_range.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        session.write_cell(
+            CalcTarget(kind="cell", sheet="Sheet1", row=30, col=15),
+            "Far cell",
+            value_type="text",
+        )
+
+    preview_path = tmp_path / "preview.png"
+    full_path = tmp_path / "full.png"
+    preview = snapshot_area(
+        str(doc_path), str(preview_path), row=0, col=0, width=800, height=600
+    )
+    full = snapshot_area(
+        str(doc_path), str(full_path), row=0, col=0, width=None, height=None
+    )
+
+    assert full.width >= preview.width
+    assert full.height >= preview.height
+
+
+def test_snapshot_area_none_dimensions_select_true_used_range(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+
+    from calc.snapshot import snapshot_area
+
+    doc_path = tmp_path / "fake.ods"
+    doc_path.write_bytes(b"fake")
+
+    class _RangeAddress:
+        StartColumn = 0
+        StartRow = 0
+        EndColumn = 15
+        EndRow = 30
+
+    class _Cursor:
+        def gotoStartOfUsedArea(self, expand):
+            return None
+
+        def gotoEndOfUsedArea(self, expand):
+            return None
+
+        def getRangeAddress(self):
+            return _RangeAddress()
+
+    class _Sheet:
+        def __init__(self):
+            self.selected = None
+            self.Columns = SimpleNamespace(
+                getByIndex=lambda index: SimpleNamespace(Width=1000)
+            )
+            self.Rows = SimpleNamespace(
+                getByIndex=lambda index: SimpleNamespace(Height=500)
+            )
+
+        def createCursor(self):
+            return _Cursor()
+
+        def getCellRangeByPosition(self, start_col, start_row, end_col, end_row):
+            self.selected = (start_col, start_row, end_col, end_row)
+            return object()
+
+    class _Sheets:
+        Count = 1
+
+        def __init__(self, sheet):
+            self._sheet = sheet
+
+        def hasByName(self, name):
+            return name == "Sheet1"
+
+        def getByName(self, name):
+            return self._sheet
+
+        def getByIndex(self, index):
+            return self._sheet
+
+    class _Controller:
+        def __init__(self):
+            self.selection = None
+
+        def setActiveSheet(self, sheet):
+            return None
+
+        def select(self, cell_range):
+            self.selection = cell_range
+
+    class _Doc:
+        def __init__(self, sheet):
+            self.Sheets = _Sheets(sheet)
+            self._controller = _Controller()
+
+        def getCurrentController(self):
+            return self._controller
+
+        def storeToURL(self, *_args):
+            return None
+
+        def close(self, *_args):
+            return None
+
+    class _Desktop:
+        def __init__(self, doc):
+            self._doc = doc
+
+        def loadComponentFromURL(self, *_args):
+            return self._doc
+
+    class _UnoContext:
+        def __init__(self, desktop):
+            self._desktop = desktop
+
+        def __enter__(self):
+            return self._desktop
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    sheet = _Sheet()
+    doc = _Doc(sheet)
+    desktop = _Desktop(doc)
+
+    monkeypatch.setattr("calc.snapshot.uno_context", lambda: _UnoContext(desktop))
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "uno",
+        SimpleNamespace(
+            createUnoStruct=lambda _name: SimpleNamespace(Name="", Value=None),
+            Any=lambda _type, value: value,
+        ),
+    )
+    monkeypatch.setattr("calc.snapshot._read_png_dimensions", lambda _path: (1600, 900))
+
+    result = snapshot_area(str(doc_path), str(tmp_path / "out.png"), sheet="Sheet1")
+
+    assert sheet.selected == (0, 0, 15, 30)
+    assert result.width == 1600
+    assert result.height == 900

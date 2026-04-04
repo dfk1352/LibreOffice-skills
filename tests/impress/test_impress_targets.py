@@ -233,6 +233,28 @@ def test_notes_targets_resolve_the_notes_text_shape_for_requested_slide(tmp_path
     assert "review outputs" in notes_text.lower()
 
 
+def test_notes_targets_ignore_non_notes_page_shapes(tmp_path):
+    from impress import ImpressTarget
+    from impress.targets import resolve_text_range
+
+    doc_path = tmp_path / "notes_page_shape_filter.odp"
+    _create_target_fixture(doc_path)
+
+    with open_impress_doc(doc_path) as doc:
+        notes_page = doc.DrawPages.getByIndex(3).getNotesPage()
+        # The page thumbnail placeholder exists before the notes text shape on this build.
+        assert (
+            str(notes_page.getByIndex(0).ShapeType)
+            == "com.sun.star.presentation.PageShape"
+        )
+        notes_range = resolve_text_range(
+            ImpressTarget(kind="notes", slide_index=3), doc
+        )
+        notes_text = notes_range.getString()
+
+    assert notes_text == "Speaker notes mention review outputs"
+
+
 def test_list_targets_identify_structural_list_instead_of_bullet_text(tmp_path):
     from impress import ImpressTarget
     from impress.targets import resolve_list_target

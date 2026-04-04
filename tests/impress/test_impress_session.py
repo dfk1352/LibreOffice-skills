@@ -566,7 +566,8 @@ def test_import_master_page_copies_background_from_template(tmp_path):
     create_presentation(str(doc_path))
 
     with ImpressSession(str(doc_path)) as session:
-        imported_name = session.import_master_page(str(template_path))
+        result = session.import_master_page(str(template_path))
+        imported_name = result.master_name
         # Find the imported master page and verify it has the red background
         masters = session.doc.MasterPages
         imported_master = None
@@ -581,6 +582,136 @@ def test_import_master_page_copies_background_from_template(tmp_path):
         assert fill_color == 0xFF0000, (
             f"Expected red background (0xFF0000), got {fill_color:#x}"
         )
+
+
+def test_import_master_page_raises_when_shape_copy_fails(tmp_path, monkeypatch):
+    from unittest.mock import patch as mock_patch
+
+    from impress import ImpressSession
+    from impress.exceptions import ImpressSkillError
+
+    class _Shape:
+        ShapeType = "com.sun.star.drawing.TextShape"
+        Size = object()
+        Position = object()
+
+    class _Master:
+        Name = "Template Master"
+        Count = 1
+        Background = None
+
+        def getByIndex(self, index):
+            return _Shape()
+
+    class _Masters:
+        Count = 0
+
+        def insertNewByIndex(self, index):
+            return type("TargetMaster", (), {"Name": "", "Background": None})()
+
+        def getByIndex(self, index):
+            raise AssertionError("unexpected")
+
+    class _TemplateDoc:
+        MasterPages = type(
+            "TemplateMasters", (), {"getByIndex": lambda self, index: _Master()}
+        )()
+
+        def close(self, value):
+            return None
+
+    session = ImpressSession.__new__(ImpressSession)
+    session._closed = False
+    session._doc = type(
+        "Doc",
+        (),
+        {
+            "MasterPages": _Masters(),
+            "createInstance": lambda self, service: (_ for _ in ()).throw(
+                RuntimeError("synthetic create failure")
+            ),
+        },
+    )()
+    session._desktop = type(
+        "Desktop", (), {"loadComponentFromURL": lambda self, *args: _TemplateDoc()}
+    )()
+
+    with mock_patch("impress.session.Path.exists", return_value=True):
+        with pytest.raises(ImpressSkillError, match="shape 0 copy failed"):
+            session.import_master_page(str(tmp_path / "template_fail.odp"))
+
+
+def test_import_master_page_returns_structural_result_on_partial_failure(tmp_path):
+    from unittest.mock import patch as mock_patch
+    from impress import ImpressSession
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "target_warn.odp"
+    create_presentation(str(doc_path))
+    template_path = tmp_path / "template_warn.odp"
+    create_presentation(str(template_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        # Mock getPropertyValue on the source background to raise an exception
+        # which triggers the warning code path
+        original_getattr = getattr
+
+        def fake_getattr(obj, name, default=None):
+            if (
+                name == "Background"
+                and hasattr(obj, "Name")
+                and str(obj.Name) == "Default"
+            ):
+
+                class FakeBg:
+                    def getPropertyValue(self, prop):
+                        if prop == "FillColor":
+                            raise RuntimeError("Simulated property error")
+                        return 0
+
+                return FakeBg()
+            return original_getattr(obj, name, default)
+
+        with mock_patch("impress.session.getattr", side_effect=fake_getattr):
+            result = session.import_master_page(str(template_path))
+
+        assert result.master_name == "Default"
+        assert result.copied_shape_count >= 0
+        assert len(result.warnings) > 0
+        assert any("Simulated property error" in w for w in result.warnings)
+
+
+def test_apply_master_page_can_target_a_single_slide(tmp_path):
+    from impress import ImpressSession, ImpressTarget
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "single_slide_master.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        session.add_slide()
+        session.add_slide()
+        custom = session.doc.MasterPages.insertNewByIndex(session.doc.MasterPages.Count)
+        custom.Name = "CustomMaster"
+        import uno
+
+        background = custom.Background
+        background.setPropertyValue(
+            "FillStyle", uno.Enum("com.sun.star.drawing.FillStyle", "SOLID")
+        )
+        background.setPropertyValue("FillColor", 0x123456)
+
+        session.apply_master_page(
+            ImpressTarget(kind="slide", slide_index=1),
+            ImpressTarget(kind="master_page", master_name="CustomMaster"),
+        )
+
+        masters = [
+            str(session.doc.DrawPages.getByIndex(index).MasterPage.Name)
+            for index in range(session.doc.DrawPages.Count)
+        ]
+
+    assert masters == ["Default", "CustomMaster", "Default"]
 
 
 # --- move_slide fidelity tests (#6) ---
@@ -701,3 +832,35 @@ def test_move_slide_preserves_table_data(tmp_path):
                 break
 
         assert table_found, "Moved slide should contain a table shape"
+
+
+def test_move_slide_preserves_chart_data(tmp_path):
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+    from tests.impress._helpers import get_chart_details
+
+    doc_path = tmp_path / "move_chart.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        session.add_slide()
+        session.insert_chart(
+            ImpressTarget(kind="slide", slide_index=0),
+            "bar",
+            [["Category", "North", "South"], ["Q1", 10, 20], ["Q2", 30, 40]],
+            ShapePlacement(2.0, 2.0, 10.0, 6.0),
+            title="Regional Sales",
+            name="Sales Chart",
+        )
+
+    before = get_chart_details(doc_path, 0, name="Sales Chart")
+
+    with ImpressSession(str(doc_path)) as session:
+        session.move_slide(ImpressTarget(kind="slide", slide_index=0), to_index=1)
+
+    after = get_chart_details(doc_path, 1, name="Sales Chart")
+
+    assert after["title"] == before["title"]
+    assert after["column_descriptions"] == before["column_descriptions"]
+    assert after["row_descriptions"] == before["row_descriptions"]
+    assert after["data"] == before["data"]

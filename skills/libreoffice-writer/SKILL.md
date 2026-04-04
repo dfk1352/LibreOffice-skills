@@ -36,7 +36,7 @@ WriterSession methods:
   insert_list(items: list[ListItem], ordered: bool, target: WriterTarget | None = None)
   replace_list(target: WriterTarget, items: list[ListItem], ordered: bool | None = None)
   delete_list(target: WriterTarget)
-  set_metadata(field, value)          # field: "title", "subject", "description", "author"
+  set_metadata(values: dict[str, str])
   get_metadata() -> dict[str, str]
   patch(patch_text, mode="atomic") -> PatchApplyResult
   export(output_path, export_format)
@@ -118,6 +118,12 @@ ListItem(text="Confirm scope", level=0)
 - `level` is zero-based nesting.
 - Nesting cannot skip levels.
 - `ordered=True` uses a numbering style; `ordered=False` uses bullets.
+
+## Metadata
+
+- `set_metadata()` accepts a dictionary of key-value pairs.
+- Supported keys are `title`, `author`, `subject`, `keywords`, and `description`.
+- `keywords` may be a comma-separated string; `get_metadata()` returns them as one comma-separated string.
 
 ## Patch DSL
 
@@ -271,6 +277,10 @@ Path(result.file_path).unlink(missing_ok=True)   # clean up used snapshots
 ```
 
 Use snapshots to verify layout after formatting, list edits, image placement, or table changes.
+
+- Prefer `session.export()` while a document is already open in a `WriterSession`.
+- Use standalone `export_document()` when exporting an existing file without keeping a session open.
+- `get_metadata()` normalizes `keywords` into one comma-and-space separated string.
 
 ## Common Mistakes
 

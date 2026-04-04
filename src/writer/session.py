@@ -52,31 +52,12 @@ class WriterSession(BaseSession):
         if not self._path.exists():
             raise DocumentNotFoundError(f"Document not found: {path}")
 
-        self._uno_manager: Any = None
-        self._desktop: Any = None
-        self._doc: Any = None
         self._open_document()
 
     @property
     def doc(self) -> Any:
         self._require_open()
         return self._doc
-
-    def close(self, save: bool = True) -> None:
-        if self._closed:
-            return
-        try:
-            if save:
-                self._doc.store()
-            self._doc.close(save)
-        finally:
-            try:
-                self._uno_manager.__exit__(None, None, None)
-            finally:
-                self._closed = True
-                self._doc = None
-                self._desktop = None
-                self._uno_manager = None
 
     def read_text(self, target: WriterTarget | None = None) -> str:
         self._require_open()
@@ -299,32 +280,10 @@ class WriterSession(BaseSession):
         filter_prop.Value = EXPORT_FILTERS[export_format]
         self._doc.storeToURL(output.resolve().as_uri(), (filter_prop,))
 
-    def reset(self) -> None:
-        """Discard in-memory changes and reopen the backing document."""
-        self._require_open()
-        self._doc.close(False)
-        self._uno_manager.__exit__(None, None, None)
-        try:
-            self._open_document()
-        except Exception:
-            self._closed = True
-            raise
-
-    def restore_snapshot(self, snapshot: bytes) -> None:
-        """Close the document, overwrite the file, and reopen."""
-        self._require_open()
-        self._doc.close(False)
-        self._uno_manager.__exit__(None, None, None)
-        self._path.write_bytes(snapshot)
-        try:
-            self._open_document()
-        except Exception:
-            self._closed = True
-            raise
-
     def _open_document(self) -> None:
         self._uno_manager = uno_context()
         self._desktop = self._uno_manager.__enter__()
+        assert self._path is not None
         try:
             self._doc = self._desktop.loadComponentFromURL(
                 self._path.resolve().as_uri(),
@@ -345,6 +304,7 @@ class WriterSession(BaseSession):
             raise WriterSkillError(
                 f"Failed to open Writer document: {self._path}"
             ) from exc
+        self._closed = False
 
 
 def _insert_string(text_obj: Any, cursor: Any, text: str) -> None:
@@ -436,10 +396,10 @@ def _advance_cursor_past_following_list(cursor: Any) -> tuple[Any, list[Any]]:
     text_obj = cursor.getText()
     enumeration = text_obj.createEnumeration()
     trailing_list: list[Any] = []
-    cursor_start = cursor.getStart()
+    cursor_start = _range_start(cursor)
     while enumeration.hasMoreElements():
         paragraph = enumeration.nextElement()
-        if not _range_is_after(text_obj, paragraph.getStart(), cursor_start):
+        if not _range_is_after(text_obj, _range_start(paragraph), cursor_start):
             continue
         if not paragraph.getString() and not getattr(
             paragraph, "NumberingStyleName", ""
@@ -451,7 +411,9 @@ def _advance_cursor_past_following_list(cursor: Any) -> tuple[Any, list[Any]]:
         break
     if not trailing_list:
         return cursor, []
-    return text_obj.createTextCursorByRange(trailing_list[-1].getEnd()), trailing_list
+    return text_obj.createTextCursorByRange(
+        _range_end(trailing_list[-1])
+    ), trailing_list
 
 
 def _cursor_has_text_before(cursor: Any) -> bool:
@@ -470,6 +432,34 @@ def _cursor_is_at_paragraph_boundary(cursor: Any) -> bool:
 
 def _range_is_after(text_obj: Any, first: Any, second: Any) -> bool:
     return text_obj.compareRegionStarts(first, second) < 0
+
+
+def _range_start(text_range: Any) -> Any:
+    anchored = _anchored_range(text_range)
+    if anchored is not text_range:
+        return _range_start(anchored)
+    try:
+        return text_range.getStart()
+    except AttributeError:
+        return text_range.Start
+
+
+def _range_end(text_range: Any) -> Any:
+    anchored = _anchored_range(text_range)
+    if anchored is not text_range:
+        return _range_end(anchored)
+    try:
+        return text_range.getEnd()
+    except AttributeError:
+        return text_range.End
+
+
+def _anchored_range(text_range: Any) -> Any:
+    try:
+        anchor = text_range.getAnchor()
+    except Exception:
+        anchor = getattr(text_range, "Anchor", None)
+    return anchor if anchor is not None else text_range
 
 
 def _delete_paragraph_block(doc: Any, paragraphs: list[Any]) -> Any:

@@ -45,53 +45,12 @@ class CalcSession(BaseSession):
         if not self._path.exists():
             raise DocumentNotFoundError(f"Document not found: {path}")
 
-        self._uno_manager: Any = None
-        self._desktop: Any = None
-        self._doc: Any = None
         self._open_document()
 
     @property
     def doc(self) -> Any:
         self._require_open()
         return self._doc
-
-    def close(self, save: bool = True) -> None:
-        if self._closed:
-            return
-        try:
-            if save:
-                self._doc.store()
-            self._doc.close(save)
-        finally:
-            try:
-                self._uno_manager.__exit__(None, None, None)
-            finally:
-                self._closed = True
-                self._doc = None
-                self._desktop = None
-                self._uno_manager = None
-
-    def reset(self) -> None:
-        self._require_open()
-        self._doc.close(False)
-        self._uno_manager.__exit__(None, None, None)
-        try:
-            self._open_document()
-        except Exception:
-            self._closed = True
-            raise
-
-    def restore_snapshot(self, snapshot: bytes) -> None:
-        """Close the document, overwrite the file, and reopen."""
-        self._require_open()
-        self._doc.close(False)
-        self._uno_manager.__exit__(None, None, None)
-        self._path.write_bytes(snapshot)
-        try:
-            self._open_document()
-        except Exception:
-            self._closed = True
-            raise
 
     def read_cell(self, target: CalcTarget) -> dict[str, object]:
         self._require_open()
@@ -161,16 +120,26 @@ class CalcSession(BaseSession):
                 raise InvalidPayloadError(
                     f"Range row {row_index} expects {expected_cols} values but received {len(row_values)}"
                 )
-            for col_index, value in enumerate(row_values):
-                cell = cell_range.getCellByPosition(col_index, row_index)
-                if isinstance(value, bool):
-                    cell.Value = 1.0 if value else 0.0
-                elif isinstance(value, (int, float)):
-                    cell.Value = float(value)
-                elif value is None:
-                    cell.String = ""
-                else:
-                    cell.String = str(value)
+
+        row_index = 0
+        while row_index < len(data):
+            row_kind = _homogeneous_row_kind(data[row_index])
+            if row_kind is None:
+                _write_range_row_cells(cell_range, row_index, data[row_index])
+                row_index += 1
+                continue
+
+            group_end = row_index + 1
+            while (
+                group_end < len(data)
+                and _homogeneous_row_kind(data[group_end]) == row_kind
+            ):
+                group_end += 1
+
+            _write_range_group(
+                cell_range, row_index, data[row_index:group_end], row_kind
+            )
+            row_index = group_end
 
     def format_range(self, target: CalcTarget, formatting: CellFormatting) -> None:
         self._require_open()
@@ -290,13 +259,23 @@ class CalcSession(BaseSession):
             (spec.width, spec.height),
         )
         range_address = data_range.getRangeAddress()
-        charts.addNewByName(chart_name, rectangle, (range_address,), True, True)
+        charts.addNewByName(
+            chart_name,
+            rectangle,
+            (range_address,),
+            spec.has_column_headers,
+            spec.has_row_headers,
+        )
         chart = charts.getByName(chart_name).EmbeddedObject
         chart.setDiagram(chart.createInstance(CHART_TYPES[spec.chart_type]))
-        try:
-            chart.setDataRange((range_address,))
-        except Exception:
-            pass
+        set_data_range = getattr(chart, "setDataRange", None)
+        if callable(set_data_range):
+            try:
+                set_data_range((range_address,))
+            except Exception as exc:
+                raise InvalidPayloadError(
+                    f"Failed to assign chart data range: {exc}"
+                ) from exc
         if spec.title:
             chart.HasMainTitle = True
             chart.Title.String = spec.title
@@ -374,6 +353,7 @@ class CalcSession(BaseSession):
     def _open_document(self) -> None:
         self._uno_manager = uno_context()
         self._desktop = self._uno_manager.__enter__()
+        assert self._path is not None
         try:
             self._doc = self._desktop.loadComponentFromURL(
                 self._path.resolve().as_uri(),
@@ -394,6 +374,7 @@ class CalcSession(BaseSession):
             raise CalcSessionError(
                 f"Failed to open Calc document: {self._path}"
             ) from exc
+        self._closed = False
 
 
 FORMULA_ERRORS = {"#DIV/0!", "#REF!", "#VALUE!", "#NAME?", "#N/A"}
@@ -493,6 +474,71 @@ def _find_chart_shape(sheet: Any, chart_name: str) -> Any:
         if str(getattr(shape, "PersistName", "")) == chart_name:
             return shape
     raise InvalidPayloadError(f'Chart shape not found: "{chart_name}"')
+
+
+def _homogeneous_row_kind(row_values: list[object]) -> str | None:
+    if all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        for value in row_values
+    ):
+        return "number"
+    if all(isinstance(value, str) for value in row_values):
+        return "text"
+    return None
+
+
+def _write_range_group(
+    cell_range: Any,
+    start_row: int,
+    rows: list[list[object]],
+    row_kind: str,
+) -> None:
+    values = tuple(
+        tuple(
+            float(cast(float, value)) if row_kind == "number" else str(value)
+            for value in row
+        )
+        for row in rows
+    )
+    if start_row == 0 and len(rows) == len(values):
+        if (
+            start_row == 0
+            and hasattr(cell_range, "setDataArray")
+            and len(rows)
+            == getattr(cell_range.getRangeAddress(), "EndRow", -1)
+            - getattr(cell_range.getRangeAddress(), "StartRow", 0)
+            + 1
+        ):
+            cell_range.setDataArray(values)
+            return
+    subrange = getattr(cell_range, "getCellRangeByPosition", None)
+    if subrange is not None:
+        end_col = (
+            cell_range.getRangeAddress().EndColumn
+            - cell_range.getRangeAddress().StartColumn
+        )
+        target_range = cell_range.getCellRangeByPosition(
+            0, start_row, end_col, start_row + len(rows) - 1
+        )
+        target_range.setDataArray(values)
+        return
+    for offset, row in enumerate(rows):
+        _write_range_row_cells(cell_range, start_row + offset, list(row))
+
+
+def _write_range_row_cells(
+    cell_range: Any, row_index: int, row_values: list[object]
+) -> None:
+    for col_index, value in enumerate(row_values):
+        cell = cell_range.getCellByPosition(col_index, row_index)
+        if isinstance(value, bool):
+            cell.Value = 1.0 if value else 0.0
+        elif isinstance(value, (int, float)):
+            cell.Value = float(value)
+        elif value is None:
+            cell.String = ""
+        else:
+            cell.String = str(value)
 
 
 def _point_from_rectangle(rectangle: Any) -> Any:

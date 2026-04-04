@@ -132,6 +132,21 @@ def snapshot_area(
                 cell_range = sheet_obj.getCellRangeByPosition(
                     col, row, max(col + 10, col), max(row + 20, row)
                 )
+                try:
+                    cursor = sheet_obj.createCursor()
+                    cursor.gotoStartOfUsedArea(False)
+                    cursor.gotoEndOfUsedArea(True)
+                    used = cursor.getRangeAddress()
+                    end_col = max(col, int(used.EndColumn))
+                    end_row = max(row, int(used.EndRow))
+                    cell_range = sheet_obj.getCellRangeByPosition(
+                        col,
+                        row,
+                        end_col,
+                        end_row,
+                    )
+                except Exception:
+                    pass
             controller.select(cell_range)
 
             pixel_w = width if width is not None else int(dpi * 8.27)

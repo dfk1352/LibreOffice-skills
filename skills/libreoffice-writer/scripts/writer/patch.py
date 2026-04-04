@@ -277,6 +277,8 @@ def _build_list_items(value: Any) -> list[ListItem]:
         if not isinstance(entry, dict) or "text" not in entry:
             raise _E("Each list item must be an object with text")
         level = entry.get("level", 0)
+        if isinstance(level, bool):
+            raise _E("List item level must be an integer")
         try:
             level_int = int(level)
         except (TypeError, ValueError) as exc:

@@ -278,6 +278,65 @@ def test_session_close_twice_is_idempotent(tmp_path):
     session.close()  # second close is a no-op, no exception
 
 
+def test_create_chart_surfaces_data_range_assignment_failure() -> None:
+    from calc import CalcSession
+    from calc.exceptions import InvalidPayloadError
+
+    class _Charts:
+        def hasByName(self, _name: str) -> bool:
+            return False
+
+        def addNewByName(self, *_args) -> None:
+            return None
+
+        def getByName(self, _name: str):
+            return type(
+                "ChartRef",
+                (),
+                {
+                    "EmbeddedObject": type(
+                        "Embedded",
+                        (),
+                        {
+                            "createInstance": lambda self, name: name,
+                            "setDiagram": lambda self, diagram: None,
+                            "setDataRange": lambda self, ranges: (_ for _ in ()).throw(
+                                RuntimeError("boom")
+                            ),
+                            "HasMainTitle": False,
+                            "Title": type("Title", (), {"String": ""})(),
+                        },
+                    )()
+                },
+            )()
+
+    class _Sheet:
+        Charts = _Charts()
+
+    session = CalcSession.__new__(CalcSession)
+    session._closed = False
+    session._doc = object()
+
+    spec = _chart_spec()
+
+    from unittest.mock import patch as mock_patch
+
+    with (
+        mock_patch("calc.session.resolve_sheet_target", return_value=_Sheet()),
+        mock_patch(
+            "calc.session.resolve_range_target",
+            return_value=type(
+                "Range", (), {"getRangeAddress": lambda self: object()}
+            )(),
+        ),
+        mock_patch("calc.session._rectangle_from_anchor", return_value=object()),
+    ):
+        with pytest.raises(
+            InvalidPayloadError, match="Failed to assign chart data range"
+        ):
+            session.create_chart(_sheet_target(), spec)
+
+
 def test_calc_session_context_manager_closes_after_block(tmp_path):
     from calc import CalcSession
     from calc.core import create_spreadsheet

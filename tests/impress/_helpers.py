@@ -373,6 +373,19 @@ def get_chart_details(
             title = None
 
         details["title"] = "" if title is None else title
+        try:
+            data = embedded.getData()
+            details["column_descriptions"] = [
+                str(value) for value in data.getColumnDescriptions()
+            ]
+            details["row_descriptions"] = [
+                str(value) for value in data.getRowDescriptions()
+            ]
+            details["data"] = [list(row) for row in data.getData()]
+        except Exception:
+            details["column_descriptions"] = []
+            details["row_descriptions"] = []
+            details["data"] = []
         details.update(
             {
                 "x": int(shape.Position.X),
@@ -505,7 +518,10 @@ def find_notes_text_shape(notes_page: Any) -> Any | None:
     """Return the text-bearing notes shape for one notes page."""
     for index in range(notes_page.Count):
         shape = notes_page.getByIndex(index)
-        if _shape_is_text(shape):
+        if (
+            str(getattr(shape, "ShapeType", ""))
+            == "com.sun.star.presentation.NotesShape"
+        ):
             return shape
     return None
 

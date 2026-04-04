@@ -142,6 +142,44 @@ def test_patch_atomic_mode_failure_rolls_back_document(tmp_path):
     assert get_notes_text(doc_path, 1) == ""
 
 
+def test_patch_atomic_rollback_reverses_insert_list(tmp_path):
+    from impress import patch
+
+    doc_path = tmp_path / "atomic_list_fail.odp"
+    _create_seed_presentation(doc_path)
+
+    assert get_list_paragraphs(doc_path, 1, name="Agenda Box") == []
+
+    result = patch(
+        str(doc_path),
+        "[operation]\n"
+        "type = insert_list\n"
+        "target.kind = insertion\n"
+        "target.slide_index = 1\n"
+        "target.shape_name = Agenda Box\n"
+        "target.after = Action Items\n"
+        "list.ordered = true\n"
+        'items = [{"text": "Alpha", "level": 0}, {"text": "Beta", "level": 0}]\n'
+        "[operation]\n"
+        "type = delete_item\n"
+        "target.kind = chart\n"
+        "target.slide_index = 1\n"
+        "target.shape_name = Missing Chart\n",
+        mode="atomic",
+    )
+
+    assert result.mode == "atomic"
+    assert result.overall_status == "failed"
+    assert result.document_persisted is False
+    assert [operation.status for operation in result.operations] == [
+        "ok",
+        "failed",
+    ]
+
+    assert get_list_paragraphs(doc_path, 1, name="Agenda Box") == []
+    assert get_shape_text(doc_path, 1, name="Agenda Box") == "Action Items"
+
+
 def test_patch_best_effort_mode_records_partial_success_and_persists_mutations(
     tmp_path,
 ):

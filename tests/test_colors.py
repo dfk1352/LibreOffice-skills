@@ -26,3 +26,24 @@ def test_resolve_color_rejects_unknown() -> None:
 
     with pytest.raises(ValueError):
         resolve_color("not-a-color")
+
+
+def test_resolve_color_rejects_negative() -> None:
+    from colors import resolve_color
+
+    with pytest.raises(ValueError):
+        resolve_color(-1)
+
+
+def test_resolve_color_rejects_overflow() -> None:
+    from colors import resolve_color
+
+    with pytest.raises(ValueError):
+        resolve_color(0x1000000)
+
+
+def test_resolve_color_accepts_boundary() -> None:
+    from colors import resolve_color
+
+    assert resolve_color(0) == 0
+    assert resolve_color(0xFFFFFF) == 0xFFFFFF

@@ -277,6 +277,58 @@ def test_session_insert_list_creates_unordered_list_in_order(tmp_path):
     )
 
 
+def test_session_insert_list_after_anchor_with_following_table_succeeds(tmp_path):
+    from writer import ListItem, WriterTarget, WriterSession
+    from writer.core import create_document
+
+    doc_path = tmp_path / "anchored_list_after_table.odt"
+    create_document(str(doc_path))
+
+    with WriterSession(str(doc_path)) as session:
+        session.insert_text(
+            "Quarterly Review\n\n"
+            "Executive Summary\n\n"
+            "Q1 revenue grew 18% year over year.\n\n"
+            "Metrics Table\n\n"
+            "Action Items"
+        )
+        session.insert_table(
+            rows=3,
+            cols=2,
+            data=[
+                ["Metric", "Value"],
+                ["Revenue Growth", "18%"],
+                ["Customer Retention", "94%"],
+            ],
+            name="SummaryTable",
+            target=WriterTarget(
+                kind="insertion",
+                after="Metrics Table",
+                before="Action Items",
+            ),
+        )
+        session.insert_list(
+            [
+                ListItem(text="Share summary with leadership", level=0),
+                ListItem(text="Verify retention assumptions", level=0),
+                ListItem(text="Prepare rollout plan", level=1),
+            ],
+            ordered=False,
+            target=WriterTarget(kind="insertion", after="Action Items"),
+        )
+
+    assert_list_items(
+        doc_path,
+        [
+            "Share summary with leadership",
+            "Verify retention assumptions",
+            "Prepare rollout plan",
+        ],
+        expected_levels=[0, 0, 1],
+        expected_numbering_type=BULLET_NUMBERING_TYPE,
+    )
+
+
 def test_session_insert_list_creates_ordered_list_when_requested(tmp_path):
     from writer import ListItem, WriterSession
     from writer.core import create_document

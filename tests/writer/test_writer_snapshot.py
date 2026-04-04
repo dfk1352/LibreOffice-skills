@@ -177,3 +177,65 @@ def test_snapshot_page_respects_document_page_geometry(tmp_path):
 
     # The image should be closer to Letter ratio than A4 ratio
     assert abs(actual_ratio - letter_ratio) < abs(actual_ratio - a4_ratio)
+
+
+def test__page_count_fallback_logic():
+    """_page_count prioritizes getPropertyValue('PageCount') over controller and DrawPages."""
+    from writer.snapshot import _page_count
+
+    class FakeController:
+        PageCount = 1
+
+    class FakeDrawPages:
+        Count = 1
+
+    class FakeDoc:
+        def __init__(self):
+            self.DrawPages = FakeDrawPages()
+
+        def supportsService(self, service: str) -> bool:
+            return service == "com.sun.star.text.TextDocument"
+
+        def getPropertyValue(self, prop: str) -> int:
+            if prop == "PageCount":
+                return 7
+            raise Exception("Unknown prop")
+
+        def getCurrentController(self):
+            return FakeController()
+
+    doc = FakeDoc()
+    assert _page_count(doc) == 7
+
+
+def test_snapshot_page_uses_writer_page_count_for_long_documents(tmp_path):
+    """snapshot_page should accept valid pages even when DrawPages stays at 1."""
+    from writer.core import create_document
+    from writer.snapshot import snapshot_page
+
+    doc_path = tmp_path / "many_pages.odt"
+    create_document(str(doc_path))
+
+    from uno_bridge import uno_context
+
+    with uno_context() as desktop:
+        doc = desktop.loadComponentFromURL(doc_path.resolve().as_uri(), "_blank", 0, ())
+        try:
+            text = doc.Text
+            cursor = text.createTextCursor()
+            block = (
+                "Lorem ipsum dolor sit amet, consectetur adipiscing elit. " * 20
+            ) + "\n"
+            text.insertString(cursor, block * 400, False)
+            doc.store()
+            assert doc.DrawPages.Count == 1
+            assert doc.getCurrentController().PageCount > 1
+        finally:
+            doc.close(True)
+
+    out_path = tmp_path / "late_page.png"
+    result = snapshot_page(str(doc_path), str(out_path), page=2)
+
+    assert out_path.exists()
+    assert result.width > 0
+    assert result.height > 0

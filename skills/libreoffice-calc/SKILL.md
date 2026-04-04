@@ -397,12 +397,15 @@ Path(result.file_path).unlink(missing_ok=True)   # clean up used snapshots
 
 Use snapshots to verify chart placement, formatting, and sheet layout before delivery.
 
+- `snapshot_area()` output dimensions can differ slightly from the requested size; treat small pixel differences as normal.
+
 ## Common Mistakes
 
 - Passing a relative path; UNO-facing Calc APIs expect absolute file paths.
 - Mixing up `cell` and `range` targets; Calc keeps them distinct even for one-cell selections.
 - Using one-based coordinates; rows and columns are zero-based.
 - Assuming `create_chart()` picks a random later target name; when `title` is set, targeting the chart by that same name is the safest follow-up pattern.
+- The packaged API does not expose chart-listing or validation-inspection helpers; deeper verification may require direct UNO inspection in advanced workflows.
 - Forgetting `chart.data_range.*` fields when patching chart operations.
 - Expecting exact requested PNG dimensions from `snapshot_area()`; Calc export can differ by a small amount.
 - Forgetting to clean up captured snapshots after inspection.

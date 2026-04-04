@@ -51,7 +51,7 @@ ImpressSession methods:
   list_master_pages() -> list[str]
   apply_master_page(target: ImpressTarget, master_target: ImpressTarget)
   set_master_background(target: ImpressTarget, color)
-  import_master_page(template_path) -> str
+  import_master_page(template_path) -> MasterPageImportResult
   patch(patch_text, mode="atomic") -> PatchApplyResult
   export(output_path, export_format)
   reset()
@@ -108,6 +108,7 @@ ImpressTarget(
 - Use `after` and `before` to narrow text or list resolution inside one resolved text-bearing object.
 - For object targets, prefer `shape_name`; use `shape_index` only when slide order is stable.
 - `delete_item()` accepts any non-slide delete target: `text`, `notes`, `list`, `shape`, `image`, `table`, `chart`, or `media`.
+- `apply_master_page()` supports per-slide targeting. This was verified against UNO by assigning a distinct master to one slide and confirming neighboring slides kept their previous masters.
 
 ## Formatting Payload: `TextFormatting`
 
@@ -230,6 +231,7 @@ target.shape_name = Disposable Chart
 
 - `atomic` stops on first failure, restores the original file bytes, and persists nothing.
 - `best_effort` keeps successful earlier operations and records later failures.
+- List operations participate correctly in atomic rollback because they no longer store/reset mid-operation.
 
 `PatchApplyResult` fields:
 
@@ -351,6 +353,10 @@ Path(result.file_path).unlink(missing_ok=True)   # clean up used snapshots
 
 Use snapshots to verify slide layout after text edits, master-page changes,
 table/chart placement, or other visual operations.
+
+- Layouts such as `TITLE_AND_CONTENT` provide writable title/body placeholders immediately after `add_slide()`.
+- `get_slide_inventory()` may include shapes with empty names; use the returned inventory to discover the persisted identifiers available on a slide.
+- User-supplied shape names can be normalized by LibreOffice in persisted inventory, for example spaces becoming underscores.
 
 ## Common Mistakes
 

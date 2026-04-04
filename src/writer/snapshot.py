@@ -70,7 +70,7 @@ def snapshot_page(
         if doc is None:
             raise SnapshotError(f"Failed to open document for snapshot: {doc_path}")
         try:
-            page_count = doc.DrawPages.Count
+            page_count = _page_count(doc)
             if page > page_count:
                 raise InvalidPageError(
                     f"Page {page} out of range (document has {page_count} pages)"
@@ -165,3 +165,29 @@ def _read_png_dimensions(path: Path) -> tuple[int, int]:
             f.read(16)
             w, h = struct.unpack(">II", f.read(8))
         return w, h
+
+
+def _page_count(doc: object) -> int:
+    if hasattr(doc, "supportsService") and doc.supportsService(
+        "com.sun.star.text.TextDocument"
+    ):
+        try:
+            from typing import cast, Any
+
+            return int(cast(Any, doc).getPropertyValue("PageCount"))
+        except Exception:
+            pass
+
+    controller = getattr(doc, "getCurrentController", lambda: None)()
+    controller_count = getattr(controller, "PageCount", None)
+    if isinstance(controller_count, int) and controller_count > 0:
+        return controller_count
+
+    try:
+        draw_count = int(getattr(doc, "DrawPages").Count)
+        if draw_count > 0:
+            return draw_count
+    except Exception:
+        pass
+
+    return 1

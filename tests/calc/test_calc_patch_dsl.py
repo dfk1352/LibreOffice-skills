@@ -129,6 +129,34 @@ def test_parse_patch_create_chart_block_parses_chart_spec():
     assert spec.title == "Revenue Trend"
 
 
+def test_parse_patch_create_chart_block_parses_header_flags():
+    from calc.patch import parse_patch
+
+    operations = parse_patch(
+        "[operation]\n"
+        "type = create_chart\n"
+        "target.kind = sheet\n"
+        "target.sheet = Dashboard\n"
+        "chart.chart_type = line\n"
+        "chart.data_range.kind = range\n"
+        "chart.data_range.sheet = Dashboard\n"
+        "chart.data_range.row = 0\n"
+        "chart.data_range.col = 0\n"
+        "chart.data_range.end_row = 2\n"
+        "chart.data_range.end_col = 1\n"
+        "chart.anchor_row = 5\n"
+        "chart.anchor_col = 0\n"
+        "chart.width = 5000\n"
+        "chart.height = 3000\n"
+        "chart.has_column_headers = false\n"
+        "chart.has_row_headers = false\n"
+    )
+
+    spec = operations[0].payload["spec"]
+    assert spec.has_column_headers is False
+    assert spec.has_row_headers is False
+
+
 def test_parse_patch_unknown_operation_type_raises_patch_syntax_error():
     from calc.exceptions import PatchSyntaxError
     from calc.patch import parse_patch

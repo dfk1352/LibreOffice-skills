@@ -5,7 +5,7 @@ class SkillError(Exception):
     """Base class for all skill errors across all apps."""
 
 
-class UnoBridgeError(Exception):
+class UnoBridgeError(SkillError):
     """Error related to UNO bridge operations."""
 
 

@@ -323,6 +323,193 @@ def test_session_chart_lifecycle_visibly_mutates_chart_state(tmp_path):
     assert list_chart_names(doc_path, "Data") == []
 
 
+def test_session_create_chart_respects_header_flags(tmp_path):
+    from calc import CalcTarget, ChartSpec, CalcSession
+    from calc.core import create_spreadsheet
+
+    doc_path = tmp_path / "chart_headers.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        session.add_sheet("Data")
+        session.write_range(
+            CalcTarget(kind="range", sheet="Data", row=0, col=0, end_row=1, end_col=1),
+            [[1, 2], [3, 4]],
+        )
+        session.create_chart(
+            CalcTarget(kind="sheet", sheet="Data"),
+            ChartSpec(
+                chart_type="line",
+                data_range=CalcTarget(
+                    kind="range",
+                    sheet="Data",
+                    row=0,
+                    col=0,
+                    end_row=1,
+                    end_col=1,
+                ),
+                anchor_row=4,
+                anchor_col=0,
+                width=4000,
+                height=2500,
+                title="No Headers",
+                has_column_headers=False,
+                has_row_headers=False,
+            ),
+        )
+
+        chart = session.doc.Sheets.getByName("Data").Charts.getByIndex(0)
+        assert bool(chart.HasColumnHeaders) is False
+        assert bool(chart.HasRowHeaders) is False
+
+
+def test_session_create_chart_header_flags_behavior(tmp_path):
+    from calc import CalcTarget, ChartSpec, CalcSession
+    from calc.core import create_spreadsheet
+    from tests.calc._helpers import get_chart_details
+
+    doc_path = tmp_path / "chart_behavior.ods"
+    create_spreadsheet(str(doc_path))
+
+    with CalcSession(str(doc_path)) as session:
+        session.add_sheet("Data")
+        session.write_range(
+            CalcTarget(kind="range", sheet="Data", row=0, col=0, end_row=1, end_col=1),
+            [[10, 20], [30, 40]],
+        )
+        session.create_chart(
+            CalcTarget(kind="sheet", sheet="Data"),
+            ChartSpec(
+                chart_type="line",
+                data_range=CalcTarget(
+                    kind="range",
+                    sheet="Data",
+                    row=0,
+                    col=0,
+                    end_row=1,
+                    end_col=1,
+                ),
+                anchor_row=4,
+                anchor_col=0,
+                width=4000,
+                height=2500,
+                has_column_headers=False,
+                has_row_headers=False,
+            ),
+        )
+        session.doc.store()
+
+    details = get_chart_details(doc_path, "Data", index=0)
+    data = details.get("data")
+    if data:
+        # If successfully read chart data, verify all four values exist
+        # Since has_column_headers and has_row_headers are False, no labels should be consumed
+        all_values = set()
+        for row in data:
+            all_values.update(row)
+        assert 10 in all_values
+        assert 20 in all_values
+        assert 30 in all_values
+        assert 40 in all_values
+    else:
+        pytest.skip("Embedded chart data not available for inspection")
+
+
+def test_write_range_uses_set_data_array_for_numeric_rows() -> None:
+    from calc import CalcSession, CalcTarget
+
+    class _RangeAddress:
+        StartRow = 0
+        EndRow = 1
+        StartColumn = 0
+        EndColumn = 1
+
+    class _CellRange:
+        def __init__(self) -> None:
+            self.data_array_calls: list[tuple[tuple[float, ...], ...]] = []
+            self.cell_calls = 0
+
+        def getRangeAddress(self):
+            return _RangeAddress()
+
+        def setDataArray(self, values):
+            self.data_array_calls.append(values)
+
+        def getCellByPosition(self, col, row):
+            self.cell_calls += 1
+            return type("Cell", (), {"Value": 0.0, "String": ""})()
+
+    session = CalcSession.__new__(CalcSession)
+    session._closed = False
+    session._doc = object()
+    cell_range = _CellRange()
+
+    from unittest.mock import patch as mock_patch
+
+    with mock_patch("calc.session.resolve_range_target", return_value=cell_range):
+        session.write_range(
+            CalcTarget(
+                kind="range", sheet="Sheet1", row=0, col=0, end_row=1, end_col=1
+            ),
+            [[1, 2], [3, 4]],
+        )
+
+    assert cell_range.data_array_calls == [((1.0, 2.0), (3.0, 4.0))]
+    assert cell_range.cell_calls == 0
+
+
+def test_write_range_mixed_rows_fall_back_to_cell_writes() -> None:
+    from calc import CalcSession, CalcTarget
+
+    class _RangeAddress:
+        StartRow = 0
+        EndRow = 1
+        StartColumn = 0
+        EndColumn = 1
+
+    class _Cell:
+        def __init__(self) -> None:
+            self.Value = None
+            self.String = None
+
+    class _CellRange:
+        def __init__(self) -> None:
+            self.data_array_calls = 0
+            self.cells: dict[tuple[int, int], _Cell] = {}
+
+        def getRangeAddress(self):
+            return _RangeAddress()
+
+        def setDataArray(self, values):
+            self.data_array_calls += 1
+
+        def getCellByPosition(self, col, row):
+            cell = _Cell()
+            self.cells[(col, row)] = cell
+            return cell
+
+    session = CalcSession.__new__(CalcSession)
+    session._closed = False
+    session._doc = object()
+    cell_range = _CellRange()
+
+    from unittest.mock import patch as mock_patch
+
+    with mock_patch("calc.session.resolve_range_target", return_value=cell_range):
+        session.write_range(
+            CalcTarget(
+                kind="range", sheet="Sheet1", row=0, col=0, end_row=1, end_col=1
+            ),
+            [[1, True], [None, "text"]],
+        )
+
+    assert cell_range.data_array_calls == 0
+    assert cell_range.cells[(0, 0)].Value == 1.0
+    assert cell_range.cells[(1, 0)].Value == 1.0
+    assert cell_range.cells[(0, 1)].String == ""
+    assert cell_range.cells[(1, 1)].String == "text"
+
+
 def test_session_recalculate_updates_formula_results_after_earlier_writes(tmp_path):
     from calc import CalcTarget, CalcSession
     from calc.core import create_spreadsheet

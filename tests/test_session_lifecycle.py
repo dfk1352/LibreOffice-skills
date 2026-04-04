@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 
 def test_exit_on_exception_does_not_save(tmp_path):
     """When an exception is raised inside a with-block, changes must not persist (#1)."""
@@ -179,3 +181,117 @@ def test_atomic_rollback_preserves_unsaved_edits(tmp_path):
         # After rollback, the pre-patch edit should still be present
         text = session.read_text()
         assert "pre-patch edit" in text
+
+
+class _DummyManager:
+    def __init__(self) -> None:
+        self.exit_calls: list[tuple[object, object, object]] = []
+
+    def __exit__(self, exc_type, exc, exc_tb) -> None:
+        self.exit_calls.append((exc_type, exc, exc_tb))
+
+
+class _DummyDoc:
+    def __init__(self) -> None:
+        self.store_calls = 0
+        self.close_calls: list[bool] = []
+
+    def store(self) -> None:
+        self.store_calls += 1
+
+    def close(self, deliver_ownership: bool) -> None:
+        self.close_calls.append(deliver_ownership)
+
+
+def test_base_session_defines_close_reset(tmp_path):
+    from session import BaseSession
+
+    class DummySession(BaseSession):
+        def __init__(self, path: Path) -> None:
+            super().__init__()
+            self._path = path
+            self.open_count = 0
+            self._open_document()
+
+        def _open_document(self) -> None:
+            self.open_count += 1
+            self._uno_manager = _DummyManager()
+            self._desktop = object()
+            self._doc = _DummyDoc()
+
+    snapshot_path = tmp_path / "snapshot.bin"
+    snapshot_path.write_bytes(b"before")
+    session = DummySession(snapshot_path)
+    original_doc = session._doc
+    original_manager = session._uno_manager
+
+    assert "close" not in DummySession.__dict__
+    assert "reset" not in DummySession.__dict__
+    assert "restore_snapshot" not in DummySession.__dict__
+
+    session.reset()
+
+    assert original_doc.close_calls == [True]
+    assert len(original_manager.exit_calls) == 1
+    assert session.open_count == 2
+
+    replacement_doc = session._doc
+    replacement_manager = session._uno_manager
+    session.restore_snapshot(b"after")
+
+    assert replacement_doc.close_calls == [True]
+    assert len(replacement_manager.exit_calls) == 1
+    assert snapshot_path.read_bytes() == b"after"
+    assert session.open_count == 3
+
+    final_doc = session._doc
+    session.close(save=False)
+
+    assert final_doc.store_calls == 0
+    assert final_doc.close_calls == [True]
+    assert session._closed is True
+
+
+def test_writer_close_always_delivers_ownership() -> None:
+    from writer.session import WriterSession
+
+    session = WriterSession.__new__(WriterSession)
+    session._closed = False
+    session._doc = _DummyDoc()
+    session._desktop = object()
+    session._uno_manager = _DummyManager()
+
+    doc = session._doc
+    session.close(save=False)
+
+    assert doc.close_calls == [True]
+
+
+def test_calc_close_always_delivers_ownership() -> None:
+    from calc.session import CalcSession
+
+    session = CalcSession.__new__(CalcSession)
+    session._closed = False
+    session._doc = _DummyDoc()
+    session._desktop = object()
+    session._uno_manager = _DummyManager()
+
+    doc = session._doc
+    session.close(save=False)
+
+    assert doc.close_calls == [True]
+
+
+def test_impress_close_always_delivers_ownership() -> None:
+    from impress.session import ImpressSession
+
+    session = ImpressSession.__new__(ImpressSession)
+    session._closed = False
+    session._doc = _DummyDoc()
+    session._desktop = object()
+    session._uno_manager = _DummyManager()
+
+    doc = session._doc
+    session.close(save=False)
+
+    assert doc.close_calls == [True]

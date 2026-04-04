@@ -162,6 +162,8 @@ def resolve_color(color: int | str) -> int:
         TypeError: If color is not an int or str.
     """
     if isinstance(color, int):
+        if color < 0 or color > 0xFFFFFF:
+            raise ValueError(f"Color integer out of range: {color}")
         return color
     if not isinstance(color, str):
         raise TypeError("Color must be an int or color name string")

@@ -30,7 +30,7 @@ with the UNO API directly.
 
 ## Who This Is For
 
-This skill suite targets **AI agents** that need to produce or modify real LibreOffice documents as part of their work. Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, etc. Any harness that's compatible with [agent skills](https://agentskills.io/home).
+This skill suite targets AI agents that need to produce or modify real LibreOffice documents as part of their work. Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, etc. Any agent harness that's compatible with [agent skills](https://agentskills.io/home).
 
 In other words, this skill suite is designed for users who want a well-tested, headless Python library on top of LibreOffice's UNO API, automating LibreOffice operations without building the infrastructure themselves.
 

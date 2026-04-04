@@ -191,3 +191,20 @@ def test_parse_patch_unterminated_heredoc_raises_patch_syntax_error():
             "new_text <<EOF\n"
             "Never closed\n"
         )
+
+
+def test_parse_patch_rejects_boolean_list_level():
+    from impress.exceptions import PatchSyntaxError
+    from impress.patch import parse_patch
+
+    with pytest.raises(PatchSyntaxError, match="List item level must be an integer"):
+        parse_patch(
+            "[operation]\n"
+            "type = insert_list\n"
+            "target.kind = insertion\n"
+            "target.slide_index = 1\n"
+            "list.ordered = false\n"
+            "items <<JSON\n"
+            '[{"text": "Item", "level": true}]\n'
+            "JSON\n"
+        )

@@ -127,6 +127,30 @@ def get_chart_details(
         if getattr(embedded, "HasMainTitle", False):
             title = str(embedded.Title.String)
 
+        data = None
+        row_desc = None
+        col_desc = None
+        try:
+            dp = embedded.getDataProvider()
+            if dp:
+                # If DataProvider exists, we can get data. Or we can just use embedded.Data
+                # But actually, older chart API uses getData() on the chart document itself
+                pass
+            if hasattr(embedded, "getData"):
+                data_array = embedded.getData()
+                if data_array and hasattr(data_array, "getData"):
+                    data_obj = data_array.getData()
+                else:
+                    data_obj = data_array
+                data = [list(row) for row in data_obj]
+
+                if hasattr(embedded, "getRowDescriptions"):
+                    row_desc = list(embedded.getRowDescriptions())
+                if hasattr(embedded, "getColumnDescriptions"):
+                    col_desc = list(embedded.getColumnDescriptions())
+        except Exception:
+            pass
+
         return {
             "name": str(table_chart.Name),
             "title": title,
@@ -135,6 +159,9 @@ def get_chart_details(
             "y": int(shape.BoundRect.Y),
             "width": int(shape.BoundRect.Width),
             "height": int(shape.BoundRect.Height),
+            "data": data,
+            "row_descriptions": row_desc,
+            "column_descriptions": col_desc,
         }
 
 

@@ -372,6 +372,9 @@ def test_session_chart_operations_mutate_chart_state_or_presence(tmp_path):
     assert updated["title"] == "Revenue Trend Updated"
     assert updated["x"] == 2000
     assert updated["width"] == 12000
+    assert updated["column_descriptions"] == ["Revenue", "Cost"]
+    assert updated["row_descriptions"] == ["Value"]
+    assert updated["data"] == [[110.0, 75.0]]
 
     with ImpressSession(str(doc_path)) as session:
         session.delete_item(
@@ -380,6 +383,74 @@ def test_session_chart_operations_mutate_chart_state_or_presence(tmp_path):
 
     names = [shape["name"] for shape in get_slide_shapes(doc_path, 0)]
     assert all(name.lower() != "revenue_chart" for name in names)
+
+
+def test_session_list_operations_do_not_persist_before_atomic_patch_succeeds(tmp_path):
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "atomic_list_rollback.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        session.insert_text_box(
+            ImpressTarget(kind="slide", slide_index=0),
+            "Action Items",
+            ShapePlacement(1.0, 1.0, 10.0, 4.0),
+            name="Agenda Box",
+        )
+
+    with ImpressSession(str(doc_path)) as session:
+        result = session.patch(
+            "[operation]\n"
+            "type = insert_list\n"
+            "target.kind = insertion\n"
+            "target.slide_index = 0\n"
+            "target.shape_name = Agenda Box\n"
+            "target.after = Action Items\n"
+            "list.ordered = false\n"
+            'items = [{"text": "Should roll back", "level": 0}]\n'
+            "[operation]\n"
+            "type = delete_item\n"
+            "target.kind = chart\n"
+            "target.slide_index = 0\n"
+            "target.shape_name = Missing Chart\n",
+            mode="atomic",
+        )
+        assert result.overall_status == "failed"
+
+    assert get_shape_text(doc_path, 0, name="Agenda Box") == "Action Items"
+    assert get_list_paragraphs(doc_path, 0, name="Agenda Box") == []
+
+
+def test_session_update_chart_applies_changes_once(tmp_path):
+    from unittest.mock import patch as mock_patch
+
+    from impress import ImpressSession, ImpressTarget, ShapePlacement
+    from impress.core import create_presentation
+
+    doc_path = tmp_path / "chart_single_pass.odp"
+    create_presentation(str(doc_path))
+
+    with ImpressSession(str(doc_path)) as session:
+        session.insert_chart(
+            ImpressTarget(kind="slide", slide_index=0),
+            "bar",
+            [["Category", "Value"], ["A", 10]],
+            ShapePlacement(1.0, 1.0, 8.0, 5.0),
+            title="Before",
+            name="Revenue Chart",
+        )
+        with mock_patch("impress.session._update_chart_shape") as update_chart_shape:
+            session.update_chart(
+                ImpressTarget(kind="chart", slide_index=0, shape_name="Revenue Chart"),
+                chart_type="line",
+                data=[["Category", "Value"], ["A", 11]],
+                placement=ShapePlacement(2.0, 1.5, 9.0, 5.5),
+                title="After",
+            )
+
+    assert update_chart_shape.call_count == 1
 
 
 def test_session_media_operations_mutate_media_objects(tmp_path):

@@ -288,13 +288,14 @@ def run_end_to_end_workflow(output_dir: Path) -> dict[str, Path]:
         )
 
         imported_master = session.import_master_page(str(template_path))
+        imported_master_name = imported_master.master_name
         session.set_master_background(
-            ImpressTarget(kind="master_page", master_name=imported_master),
+            ImpressTarget(kind="master_page", master_name=imported_master_name),
             "lightsteelblue",
         )
         session.apply_master_page(
             ImpressTarget(kind="slide", slide_index=2),
-            ImpressTarget(kind="master_page", master_name=imported_master),
+            ImpressTarget(kind="master_page", master_name=imported_master_name),
         )
 
         inventory = session.get_slide_inventory(

@@ -585,6 +585,11 @@ def _cursor_index(text_obj: Any, position: Any) -> int:
 def _find_notes_text_shape(notes_page: Any) -> Any | None:
     for index in range(notes_page.Count):
         shape = notes_page.getByIndex(index)
+        if (
+            str(getattr(shape, "ShapeType", ""))
+            != "com.sun.star.presentation.NotesShape"
+        ):
+            continue
         try:
             shape.getText()
             shape.getString()

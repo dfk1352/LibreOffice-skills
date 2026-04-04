@@ -62,6 +62,10 @@ _CHART_INT_KEYS = {
     "chart.width",
     "chart.height",
 }
+_CHART_BOOL_KEYS = {
+    "chart.has_column_headers",
+    "chart.has_row_headers",
+}
 _CHART_RANGE_INT_KEYS = {
     "row",
     "col",
@@ -308,6 +312,8 @@ def _build_chart_spec(payload: dict[str, Any]) -> ChartSpec:
         width=_require_int_payload(payload, "chart.width"),
         height=_require_int_payload(payload, "chart.height"),
         title=_optional_string(payload.get("chart.title")),
+        has_column_headers=payload.get("chart.has_column_headers", True),
+        has_row_headers=payload.get("chart.has_row_headers", True),
     )
 
 
@@ -330,6 +336,8 @@ def _coerce_rule_value(key: str, value: str) -> Any:
 def _coerce_chart_value(key: str, value: str) -> Any:
     if key in _CHART_INT_KEYS:
         return coerce_int(value, key, _E)
+    if key in _CHART_BOOL_KEYS:
+        return coerce_bool(value, key, _E)
     if key.startswith("chart.data_range."):
         field = key.split(".", 2)[2]
         if field in _CHART_RANGE_INT_KEYS:
