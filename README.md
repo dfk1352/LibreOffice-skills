@@ -2,23 +2,21 @@
 
 [![CI](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml)
 
-A Python skill suite that lets AI agents create and edit LibreOffice documents,
-spreadsheets, and presentations through a clean, stable API — without wrestling
-with the UNO API directly.
+A set of CLI tools designed for LLM agents to create, modify, and visually inspect LibreOffice artifacts.
+Currently supports Writer, Calc, and Impress.
+Bundled as [agent skills](https://agentskills.io/home), compatible with all mainstream agent harnesses.
 
 ---
 
 ## Table of Contents
 
 **Quick start:**
-- [Who This Is For](#who-this-is-for)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 
 **A bit more on the details:**
 - [Why This Exists](#why-this-exists)
-- [What's Included](#whats-included)
-- [How It Works](#how-it-works)
+- [What's Included](#Features)
 - [Usage Examples](#usage-examples)
 
 **Development & contributing:**
@@ -28,29 +26,18 @@ with the UNO API directly.
 
 ---
 
-## Who This Is For
-
-This skill suite targets AI agents that need to produce or modify real LibreOffice documents as part of their work. Openclaw, Claude Code, Cowork, OpenCode, Codex, Amp, Cursor, Roo Code, Kilo Code, Antigravity, etc. Any agent harness that's compatible with [agent skills](https://agentskills.io/home).
-
-In other words, this skill suite is designed for users who want a well-tested, headless Python library on top of LibreOffice's UNO API, automating LibreOffice operations without building the infrastructure themselves.
-
-Local first, free to use.
-
----
-
 ## Prerequisites
 
 | Requirement | Version | Notes |
 |---|---|---|
 | Python | 3.12+ | |
-| LibreOffice | 26.2+ (recommended) | System-installed; headless mode used |
-| uv | Any recent | Package manager (recommended, for development only) |
+| LibreOffice | 26.2+ | older versions work with limited functionalities (see below) |
 
 ### Installing LibreOffice
 
 Visit and download the installer from the [official LibreOffice download page](https://www.libreoffice.org/download/download-libreoffice/).
 
-The skill scans common spots to locate the LibreOffice binary. For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
+The skill automatically scans common spots to locate the LibreOffice binary. For non-standard installs, set the `LIBREOFFICE_PROGRAM_PATH` environment variable to the LibreOffice program directory.
 
 Some features, including Markdown import/export and Calc JSON/XML import, require LibreOffice 26.2 or newer.
 
@@ -58,27 +45,20 @@ Some features, including Markdown import/export and Calc JSON/XML import, requir
 
 ## Installation
 
-### Via `npx skills`
+### Quick Installation (Recommended)
 
 ```bash
-npx skills add dfk1352/LibreOffice-skills
+npx skills add dfk1352/LibreOffice-skills           # via `npx skills`
+
+npx openskills install dfk1352/LibreOffice-skills   # via `npx openskills`
 ```
 
-### Via `npx openskills`
-
-```bash
-npx openskills install dfk1352/LibreOffice-skills
-```
-
-### From Source
+### Build From Source
 
 ```bash
 git clone https://github.com/dfk1352/LibreOffice-skills.git
 cd LibreOffice-skills
 uv sync
-
-# Rebuild the skills/*/scripts/ bundles from src/ (after any src/ change)
-python scripts/sync_bundles.py
 ```
 
 Then copy (or symlink) the skill folders into your agent harness's skill directory (typically `~/.agents/skills/`):
@@ -89,7 +69,7 @@ cp -r skills/libreoffice-calc    ~/.agents/skills/
 cp -r skills/libreoffice-impress ~/.agents/skills/
 ```
 
-If the `uno` Python module is not on the default path (common on Linux), add the system UNO package alongside it:
+If the `uno` Python module is not on the default path, add the system UNO package alongside it:
 
 ```bash
 export PYTHONPATH="$HOME/.agents/skills/libreoffice-writer/scripts:/usr/lib/python3/dist-packages"
@@ -101,19 +81,17 @@ export PYTHONPATH="$HOME/.agents/skills/libreoffice-impress/scripts:/usr/lib/pyt
 
 ## Why This Exists
 
-LibreOffice's UNO API is powerful but notoriously difficult. Agents that try to drive it directly spend most of their token budget on error recovery rather than the actual task.
+Agents that try to drive the LibreOffice's UNO API directly oftentimes spend most of their token budget on error recovery rather than the actual task. This skill suite aims to solve that by packaging the UNO complexity behind a small, predictable interface:
 
-This skill suite aims to solve that by packaging the UNO complexity behind a small, predictable interface:
-
-- **Session-based editing** — open a document once, make all your changes through a single live connection, close and save. No per-operation process  spawning overhead, no race conditions.
+- **Session-based editing** — open a document once, make all changes through a single live connection, close and save. No per-operation process  spawning overhead, no race conditions.
 - **Patch DSL** — express a multi-step edit plan as a single structured string and get back a machine-readable result. Supports `atomic` mode (all-or-nothing) and `best_effort` mode (apply what you can, report what failed).
 - **Isolated headless process** — each session launches LibreOffice with a throwaway user profile and a unique named pipe. Nothing leaks between sessions; CI servers stay clean.
 - **Visual verification** — every skill exposes a snapshot function that exports a PNG of a page, spreadsheet area, or slide, so an agent can inspect the rendered output before handing the file to the user.
-- **Zero install on the agent side** — the `scripts/` bundle is a self-contained Python package. Drop it on `PYTHONPATH` and `import writer` / `import calc` / `import impress` just works.
+- **Zero install on the agent side** — the `scripts/` bundle is a self-contained Python package.
 
 ---
 
-## What's Included
+## Features
 
 Three skills ship in this repository, all sharing the same session/patch design and the same underlying UNO bridge.
 
@@ -138,29 +116,17 @@ All three skills include the same set of shared modules:
 - **UNO Bridge** — headless LibreOffice process management and connection.
 - **Session base** — `BaseSession` with context-manager support and closed-guard semantics.
 - **Color helpers** — `resolve_color()` accepts CSS color names (`"cornflowerblue"`) or `0xRRGGBB` integers interchangeably.
-- **Exception hierarchy** — app-specific errors (`WriterSkillError`, `CalcSkillError`, `ImpressSkillError`) with precise subclasses for target resolution failures, ambiguous matches, and formatting errors.
-- **Snapshot tool** — app-specific utility to help agents with visual modality to verify editting results.
-
----
-
-## How It Works
-
-Each editing session maps to exactly one headless LibreOffice process and one open document. The process is spawned with a unique named pipe and a temporary, isolated user profile that is discarded on exit. Nothing persists between sessions; no global state can accumulate.
-
-Within a session, every operation goes through the live UNO connection — text insertions, cell writes, slide manipulations — without reopening the file each time. When the session closes (or its context manager exits), the document is saved and the process is terminated.
-
-The **patch interface** is a higher-level layer on top of sessions. It accepts an INI-style string describing one or more operations, executes them in order against the open document, and returns a `PatchApplyResult` with per-operation status.
+- **Snapshot tool** — app-specific utility to help agents with visual modality to verify editing results.
 
 ---
 
 ## Usage Examples
 
-### Session API — building a report in Writer
+### Building a report in Writer
 
 ```python
 import writer
 
-# Create a blank document
 writer.create_document("report.odt")
 
 with writer.WriterSession("report.odt") as session:
@@ -184,7 +150,7 @@ with writer.WriterSession("report.odt") as session:
 result = writer.snapshot_page("report.odt", "report_preview.png", page=1)
 ```
 
-### Patch DSL — batch-editing a spreadsheet
+### Batch-editing a spreadsheet
 
 The patch interface lets an agent express an entire edit plan as a single string. This is useful when an agent wants to compose the full set of changes before committing any of them.
 
@@ -237,10 +203,10 @@ src/
   session.py             # BaseSession ABC
   colors.py              # Shared color name resolution
   exceptions.py          # Base exception hierarchy
-  writer/                # Writer skill modules
-  calc/                  # Calc skill modules
-  impress/               # Impress skill modules
-tests/                   # Unit and integration tests
+  writer/
+  calc/
+  impress/
+tests/
 skills/
   libreoffice-writer/
     SKILL.md             # Skill definition with YAML frontmatter (for agents)
