@@ -1,7 +1,7 @@
 name: CI
 
 env:
-  LIBREOFFICE_VERSION: "26.2.1"
+  LIBREOFFICE_VERSION: "26.2.3"
 
 permissions:
   contents: read
