@@ -1,6 +1,6 @@
 # LibreOffice Agent Skills
 
-[![CI](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml)
+[![CI](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml/badge.svg)](https://github.com/dfk1352/LibreOffice-skills/actions/workflows/ci.yml)[![skills.sh](https://skills.sh/b/dfk1352/LibreOffice-skills)](https://skills.sh/dfk1352/LibreOffice-skills)
 
 A set of CLI tools designed for LLM agents to create, modify, and visually inspect LibreOffice artifacts.
 Currently supports Writer, Calc, and Impress.
