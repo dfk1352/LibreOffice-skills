@@ -17,7 +17,7 @@ dev = [
     "pytest-cov~=4.1",
     "ruff~=0.15",
     "mypy~=1.19",
-    "pillow~=12.2",
+    "pillow~=12.3",
 ]
 
 [tool.uv]
